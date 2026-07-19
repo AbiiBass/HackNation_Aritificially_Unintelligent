@@ -16,7 +16,6 @@ Meta-features used (all from the PCOS cohort):
 """
 
 import os
-import json
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix

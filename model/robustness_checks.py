@@ -4,7 +4,6 @@ and a comorbidity simulation.
 """
 
 import os
-import json
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
@@ -13,7 +12,7 @@ from sklearn.metrics import roc_auc_score, accuracy_score
 import xgboost as xgb
 import joblib
 
-from train_model1 import encode_features, FEATURE_COLS as MODEL1_FEATURES
+from train_model1 import encode_features
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 SPLIT_DIR = os.path.join(DATA_DIR, "splits")
@@ -84,24 +83,24 @@ def run_ablation():
     results["C_size_matched_mixed"] = {"n_train": len(matched_train), "test_auc": float(auc_c)}
     print(f"[C] size-matched mixed-sex, n_train={len(matched_train)}: test AUC = {auc_c:.3f}")
 
-    print(f"\nInterpretation:")
+    print("\nInterpretation:")
     drop_size = auc_a - auc_c
     drop_female = auc_a - auc_b
     print(f"  Full model (A) vs size-matched mixed (C): drop = {drop_size:.3f}  <- sample-size effect alone")
     print(f"  Full model (A) vs female-only (B):         drop = {drop_female:.3f}  <- female-only effect alone")
     if drop_female < drop_size * 0.5:
-        print(f"  => Female-only restriction cost far LESS than shrinking the dataset did.")
-        print(f"     This suggests Model 2's earlier weak performance (Step 4b, AUC 0.605) was")
-        print(f"     primarily a SAMPLE SIZE / missing-lab-panel issue, NOT an inherent penalty")
-        print(f"     for training only on women. Being women-only, by itself, cost almost nothing")
-        print(f"     here once dataset size is held roughly comparable to what's plentiful.")
+        print("  => Female-only restriction cost far LESS than shrinking the dataset did.")
+        print("     This suggests Model 2's earlier weak performance (Step 4b, AUC 0.605) was")
+        print("     primarily a SAMPLE SIZE / missing-lab-panel issue, NOT an inherent penalty")
+        print("     for training only on women. Being women-only, by itself, cost almost nothing")
+        print("     here once dataset size is held roughly comparable to what's plentiful.")
     elif drop_female > drop_size * 1.5:
-        print(f"  => Female-only restriction cost noticeably MORE than sample size alone would")
-        print(f"     predict. This is actual evidence that something about the female-only")
-        print(f"     subset (not just its size) hurts this model -- worth investigating further.")
+        print("  => Female-only restriction cost noticeably MORE than sample size alone would")
+        print("     predict. This is actual evidence that something about the female-only")
+        print("     subset (not just its size) hurts this model -- worth investigating further.")
     else:
-        print(f"  => The two effects are similar in magnitude -- hard to cleanly separate")
-        print(f"     sample size from sex-composition with this data.")
+        print("  => The two effects are similar in magnitude -- hard to cleanly separate")
+        print("     sample size from sex-composition with this data.")
 
     return results
 
@@ -121,7 +120,6 @@ def run_heuristic_comorbidity_stress_test(n_simulations=1000):
     print("=" * 70)
 
     import joblib as jb
-    from meta_learner import CLASS_NAMES
 
     meta_model = jb.load(os.path.join(MODEL_DIR, "meta_learner.joblib"))
 
@@ -167,20 +165,20 @@ def run_heuristic_comorbidity_stress_test(n_simulations=1000):
     print(f"Mean predicted P(both) | simulated PCOS-negative:    {mean_both_when_no_pcos:.3f}")
     ratio = mean_both_when_pcos / mean_both_when_no_pcos if mean_both_when_no_pcos > 0 else float("inf")
     print(f"Ratio: {ratio:.2f}x  (compare to published epidemiological OR of 2.87x)")
-    print(f"\nInterpretation: the RIGHT check here is direction, not magnitude equality.")
-    print(f"P(both) is a JOINT/conjunction probability -- it compounds the PCOS signal")
-    print(f"AND the thyroid signal simultaneously, so it's expected to amplify beyond a")
-    print(f"single-axis marginal odds ratio like 2.87x; a much larger ratio isn't itself")
-    print(f"a red flag. What WOULD be concerning: if PCOS-negative patients showed a")
-    print(f"HIGHER or similar P(both) than PCOS-positive ones (wrong direction).")
+    print("\nInterpretation: the RIGHT check here is direction, not magnitude equality.")
+    print("P(both) is a JOINT/conjunction probability -- it compounds the PCOS signal")
+    print("AND the thyroid signal simultaneously, so it's expected to amplify beyond a")
+    print("single-axis marginal odds ratio like 2.87x; a much larger ratio isn't itself")
+    print("a red flag. What WOULD be concerning: if PCOS-negative patients showed a")
+    print("HIGHER or similar P(both) than PCOS-positive ones (wrong direction).")
     if mean_both_when_pcos > mean_both_when_no_pcos:
-        print(f"=> Direction is correct: simulated PCOS-positive patients get higher")
-        print(f"   P(both) than PCOS-negative ones, as the published comorbidity would")
-        print(f"   predict. The heuristic isn't producing a directionally implausible")
-        print(f"   result -- but this remains a simulation check, not real validation.")
+        print("=> Direction is correct: simulated PCOS-positive patients get higher")
+        print("   P(both) than PCOS-negative ones, as the published comorbidity would")
+        print("   predict. The heuristic isn't producing a directionally implausible")
+        print("   result -- but this remains a simulation check, not real validation.")
     else:
-        print(f"=> WRONG DIRECTION: this would be a genuine red flag worth investigating")
-        print(f"   immediately, unlike a magnitude mismatch alone.")
+        print("=> WRONG DIRECTION: this would be a genuine red flag worth investigating")
+        print("   immediately, unlike a magnitude mismatch alone.")
 
     return {
         "baseline_thyroid_rate": float(baseline_rate),

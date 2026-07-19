@@ -1,7 +1,7 @@
 """
 pipeline_common.py
-Shared helpers used across the pipeline: joint_class encode/decode (defined
-once here, not duplicated per-script), XGBOOST_DETERMINISTIC_PARAMS (forces
+Shared helpers used across the pipeline: encode_joint_class (defined once
+here, not duplicated per-script), XGBOOST_DETERMINISTIC_PARAMS (forces
 tree_method='exact' since the default 'hist' isn't bit-identical across CPU
 architectures), and save_json_with_metadata (stamps reports with timestamp +
 library versions).
@@ -24,13 +24,6 @@ def encode_joint_class(pcos_diagnosis, thyroid_dysfunction):
     """Single definition of the joint_class formula. Works on scalars,
     pandas Series, or numpy arrays."""
     return pcos_diagnosis * 2 + thyroid_dysfunction
-
-
-def decode_joint_class(joint_class):
-    """Inverse of encode_joint_class: returns (pcos_diagnosis, thyroid_dysfunction)."""
-    pcos_diagnosis = joint_class // 2
-    thyroid_dysfunction = joint_class % 2
-    return pcos_diagnosis, thyroid_dysfunction
 
 
 def _library_versions() -> dict:

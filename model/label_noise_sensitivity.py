@@ -24,7 +24,6 @@ MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
 # Measured on the full mixed-sex cohort (see docstring)
 MEASURED_PRECISION = 0.097
 MEASURED_RECALL = 0.993
-MEASURED_FPR = 0.462
 # Fraction of labeled positives that are actually false positives
 FALSE_DISCOVERY_RATE = 1 - MEASURED_PRECISION
 # Fraction of labeled negatives that the rule likely missed
@@ -86,7 +85,6 @@ def main(n_simulations=500):
     print("\n" + "=" * 70)
     print("Label-noise sensitivity: Meta-learner joint-class accuracy")
     print("=" * 70)
-    from train_model2b_pcos import clean_features as clean_feat_m2b
     from meta_learner import build_meta_features
     model2b = joblib.load(os.path.join(MODEL_DIR, "model2b_women_only_pcos.joblib"))
     meta_model = joblib.load(os.path.join(MODEL_DIR, "meta_learner.joblib"))
@@ -107,9 +105,9 @@ def main(n_simulations=500):
     print(f"  mean accuracy = {np.mean(sim_accs):.3f}")
     print(f"  range         = [{np.min(sim_accs):.3f}, {np.max(sim_accs):.3f}]")
     print(f"  std           = {np.std(sim_accs):.3f}")
-    print(f"\nInterpretation: unlike Model 2's AUC, this range is TIGHT and CONSISTENT --")
-    print(f"the meta-learner's reported 0.878 accuracy is likely somewhat INFLATED by")
-    print(f"proxy-label noise. A more realistic estimate, if the thyroid label were less")
+    print("\nInterpretation: unlike Model 2's AUC, this range is TIGHT and CONSISTENT --")
+    print("the meta-learner's reported 0.878 accuracy is likely somewhat INFLATED by")
+    print("proxy-label noise. A more realistic estimate, if the thyroid label were less")
     print(f"noisy, is closer to {np.mean(sim_accs):.2f}. Report both numbers, not just the higher one.")
 
     out = {

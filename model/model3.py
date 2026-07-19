@@ -22,7 +22,6 @@ score for AUC) and a binary thyroid call.
 """
 
 import os
-import json
 import pandas as pd
 from pipeline_common import save_json_with_metadata
 from sklearn.metrics import roc_auc_score, confusion_matrix, classification_report

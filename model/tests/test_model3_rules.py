@@ -10,7 +10,6 @@ from model3 import (
     pcos_criteria_score,
     TSH_LOW_HYPERTHYROID,
     TSH_HIGH_HYPOTHYROID,
-    LH_FSH_RATIO_THRESHOLD,
     FOLLICLE_COUNT_THRESHOLD,
     AMH_ELEVATED_THRESHOLD,
 )

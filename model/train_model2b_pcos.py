@@ -7,7 +7,6 @@ the full feature set including tsh is usable.
 """
 
 import os
-import json
 import pandas as pd
 from sklearn.metrics import roc_auc_score, confusion_matrix, classification_report
 import xgboost as xgb

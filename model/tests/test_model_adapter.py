@@ -3,7 +3,6 @@ Tests for model_adapter.py's doctor-facing output: the result keys
 (diagnoses/summary/warnings/joint_available), and that the text never
 leaks internal ML jargon or raw field names.
 """
-import pytest
 
 from model_adapter import _to_display
 from predict import predict

@@ -3,7 +3,6 @@ Integration tests for predict.py's ensemble pipeline, using the trained
 artifacts in model/models/. Covers routing, abstention, and the
 meta-learner combination step.
 """
-import pandas as pd
 import pytest
 
 from predict import predict, FIELDS_MODEL1, FIELDS_MODEL2, FIELDS_MODEL2B

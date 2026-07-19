@@ -14,8 +14,7 @@ high lab values (e.g. TSH in hypothyroid patients) aren't clipped.
 
 import os
 import pandas as pd
-import numpy as np
-from pipeline_common import encode_joint_class, CLASS_NAMES, save_json_with_metadata
+from pipeline_common import encode_joint_class, CLASS_NAMES
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
@@ -95,7 +94,7 @@ def main():
     print(f"saved -> {pcos_out}\n")
     print("Joint class distribution:")
     print(pcos_labeled["joint_class_name"].value_counts())
-    print(f"\nCross-tab (rows=PCOS, cols=thyroid_dysfunction):")
+    print("\nCross-tab (rows=PCOS, cols=thyroid_dysfunction):")
     print(pd.crosstab(pcos_labeled["pcos_diagnosis"], pcos_labeled["thyroid_dysfunction"]))
 
     print("\n=== Thyroid (mixed-sex) cohort ===")

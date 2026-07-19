@@ -242,7 +242,6 @@ def pdf_to_patient_json(pdf_path):
 def summarize_missing(patient_json):
     print("\nField availability by downstream model:")
     for model_name, fields in FIELDS_BY_MODEL.items():
-        present = [f for f in fields if patient_json.get(f) is not None]
         missing = [f for f in fields if patient_json.get(f) is None]
         status = "READY" if not missing else f"MISSING {len(missing)}/{len(fields)}"
         print(f"  [{status}] {model_name}")
