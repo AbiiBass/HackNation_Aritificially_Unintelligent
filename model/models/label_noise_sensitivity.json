@@ -1,0 +1,18 @@
+{
+  "measured_error_rates_source": "full mixed-sex thyroid cohort, real diagnoses (n=3163)",
+  "false_discovery_rate": 0.903,
+  "miss_rate": 0.007000000000000006,
+  "caveat": "Error rates transferred from a different population (older, mixed-sex, thyroid-referred) to the PCOS cohort (young women, PCOS-referred). This is an assumption, not a validated transfer.",
+  "model2_auc_reported": 0.6047619047619047,
+  "model2_auc_simulated_mean": 0.5653021703114428,
+  "model2_auc_simulated_range": [
+    0.024691358024691357,
+    1.0
+  ],
+  "meta_accuracy_reported": 0.8780487804878049,
+  "meta_accuracy_simulated_mean": 0.7520243902439024,
+  "meta_accuracy_simulated_range": [
+    0.7073170731707317,
+    0.7926829268292683
+  ]
+}

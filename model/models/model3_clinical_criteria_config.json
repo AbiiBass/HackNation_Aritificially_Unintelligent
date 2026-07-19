@@ -1,0 +1,7 @@
+{
+  "tsh_low_hyperthyroid": 0.4,
+  "tsh_high_hypothyroid": 4.5,
+  "lh_fsh_ratio_threshold": 2.0,
+  "follicle_count_threshold": 12,
+  "pcos_rotterdam_min_criteria": 2
+}

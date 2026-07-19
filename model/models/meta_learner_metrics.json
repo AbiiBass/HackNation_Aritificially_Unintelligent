@@ -1,0 +1,13 @@
+{
+  "model": "meta_learner",
+  "meta_features": [
+    "model2_thyroid_proba",
+    "model2_pcos_proba",
+    "pcos_criteria_count",
+    "thyroid_criteria_call"
+  ],
+  "train_accuracy": 0.9973544973544973,
+  "val_accuracy": 0.8888888888888888,
+  "test_accuracy": 0.8658536585365854,
+  "excluded_model1_reason": "Model 1 requires T3/T4/T4U/FTI, unavailable for 100% of the PCOS cohort (structural feature mismatch, not missing data)."
+}
