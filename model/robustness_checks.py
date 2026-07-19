@@ -1,29 +1,6 @@
 """
-robustness_checks.py
-Post-review fixes for critiques #2, #5, and #6.
-
-#2 -- CONTROLLED ABLATION: Model 1 (3163 patients, real labels, full lab
-panel) and Model 2 (541 patients, proxy labels, no lab panel) differ in
-THREE ways at once. The 0.995 vs 0.605 AUC gap could be entirely
-explained by sample size or label quality, with sex-composition having
-nothing to do with it. This isolates that by training two more variants
-on the SAME thyroid cohort Model 1 uses (same features, same real
-labels, same test set):
-  - "female-only":      trained on the female subset of thyroid_train
-  - "size-matched-mixed": trained on a mixed-sex subsample the same
-                            size as the PCOS cohort's training set (~378)
-If sex-composition were the real driver, female-only should lag behind
-full Model 1 by MORE than size-matched-mixed does. If they lag by
-similar amounts, it's a sample-size effect, not a sex-composition one.
-
-#5 -- BOOTSTRAP CONFIDENCE INTERVALS: every point-estimate metric so far
-(especially for classes with <10 test examples) has been reported
-without any uncertainty range. Adds 1000-resample bootstrap CIs for the
-key AUCs and the meta-learner's accuracy.
-
-#6 -- K-FOLD CROSS-VALIDATION: single train/val/test splits on a ~3000
-row dataset can be noisy. Adds 5-fold stratified CV for Model 1 as a
-more stable performance estimate than one held-out test set.
+Extra robustness checks: controlled ablation, bootstrap CIs, k-fold CV,
+and a comorbidity simulation.
 """
 
 import os
@@ -53,7 +30,7 @@ def bootstrap_ci(y_true, y_score, metric_fn, n_boot=1000, seed=42):
         idx = rng.randint(0, n, n)
         y_t, y_s = y_true[idx], y_score[idx]
         if len(np.unique(y_t)) < 2:
-            continue  # metric undefined (e.g. AUC) if resample has only one class
+            continue  # metric undefined if resample has only one class
         scores.append(metric_fn(y_t, y_s))
     lo, hi = np.percentile(scores, [2.5, 97.5])
     return float(np.mean(scores)), float(lo), float(hi)
@@ -84,13 +61,13 @@ def run_ablation():
 
     results = {}
 
-    # Variant A: full mixed-sex (this is just Model 1 -- reload it)
+    # Variant A: full mixed-sex (Model 1, reloaded)
     model_a = joblib.load(os.path.join(MODEL_DIR, "model1_generic_baseline.joblib"))
     auc_a = roc_auc_score(y_test, model_a.predict_proba(X_test)[:, 1])
     results["A_full_mixed_sex"] = {"n_train": len(train_df), "test_auc": float(auc_a)}
     print(f"\n[A] full mixed-sex, n_train={len(train_df)}: test AUC = {auc_a:.3f}")
 
-    # Variant B: female-only subset of the SAME training data
+    # Variant B: female-only subset of the same training data
     female_train = train_df[train_df["sex"] == "female"]
     Xb_train, yb_train = encode_features(female_train), female_train["thyroid_dysfunction"]
     model_b = train_xgb(Xb_train, yb_train, encode_features(val_df), val_df["thyroid_dysfunction"])
@@ -98,8 +75,7 @@ def run_ablation():
     results["B_female_only"] = {"n_train": len(female_train), "test_auc": float(auc_b)}
     print(f"[B] female-only, n_train={len(female_train)}: test AUC = {auc_b:.3f}")
 
-    # Variant C: mixed-sex but sample-size-matched to the PCOS cohort's
-    # training set (378 rows), to isolate the sample-size effect alone
+    # Variant C: mixed-sex, subsampled to the PCOS cohort's training size (378)
     pcos_train_size = len(pd.read_csv(os.path.join(SPLIT_DIR, "pcos_train.csv")))
     matched_train = train_df.sample(n=pcos_train_size, random_state=42)
     Xc_train, yc_train = encode_features(matched_train), matched_train["thyroid_dysfunction"]
@@ -131,23 +107,13 @@ def run_ablation():
 
 
 def run_heuristic_comorbidity_stress_test(n_simulations=1000):
-    """Fix for the 'unvalidated Model-1-substitution heuristic' gap.
+    """Sanity check for predict.py's Model-1-substitution heuristic.
 
-    We can't validate predict.py's heuristic (substituting Model 1's
-    thyroid probability into the meta-learner when a full panel is
-    available) against real joint ground truth -- no dataset here has
-    both a full thyroid panel AND a PCOS diagnosis on the same patients.
-
-    What we CAN do: use a published, citable comorbidity estimate (see
-    CITATIONS.md) -- PCOS patients have ~2.87x higher odds of subclinical
-    hypothyroidism (95% CI 1.82-9.92) than non-PCOS women -- to construct
-    a SIMULATED joint population with that documented correlation
-    structure, and check whether the meta-learner's blended predictions
-    behave sensibly (i.e. PCOS-positive simulated patients get higher
-    joint "both" probabilities than PCOS-negative ones, roughly tracking
-    the real-world odds ratio). This is a plausibility/sanity check
-    using real epidemiological evidence, explicitly NOT a validation
-    against ground truth on real patients.
+    No dataset has both a full thyroid panel and a PCOS diagnosis on the
+    same patients, so this simulates a joint population using a published
+    comorbidity odds ratio (~2.87x, see CITATIONS.md) and checks that the
+    meta-learner's blended predictions move in the expected direction.
+    This is a plausibility check, not a validation against real patients.
     """
     print("\n" + "=" * 70)
     print("Comorbidity-informed stress test for the Model 1 substitution heuristic")
@@ -160,9 +126,8 @@ def run_heuristic_comorbidity_stress_test(n_simulations=1000):
     meta_model = jb.load(os.path.join(MODEL_DIR, "meta_learner.joblib"))
 
     rng = np.random.RandomState(42)
-    # Published: OR = 2.87 for thyroid dysfunction given PCOS. Baseline
-    # thyroid dysfunction rate in non-PCOS women (from our thyroid cohort,
-    # females only) is our reference rate.
+    # OR=2.87 for thyroid dysfunction given PCOS; baseline rate taken
+    # from non-PCOS women in the thyroid cohort.
     thyroid_df = pd.read_csv(os.path.join(SPLIT_DIR, "thyroid_test.csv"))
     baseline_rate = thyroid_df[thyroid_df["sex"] == "female"]["thyroid_dysfunction"].mean()
     odds_ratio = 2.87
@@ -174,19 +139,17 @@ def run_heuristic_comorbidity_stress_test(n_simulations=1000):
     print(f"Implied PCOS-population thyroid dysfunction rate (OR=2.87): {pcos_thyroid_rate:.3f}")
 
     n_sim = n_simulations
-    pcos_status = rng.binomial(1, 0.5, n_sim)  # simulate a 50/50 PCOS split for balance
+    pcos_status = rng.binomial(1, 0.5, n_sim)  # 50/50 PCOS split for balance
     thyroid_rate_per_patient = np.where(pcos_status == 1, pcos_thyroid_rate, baseline_rate)
     thyroid_status = rng.binomial(1, thyroid_rate_per_patient)
 
-    # Simulate Model 1's thyroid probability as noisy-but-informative
-    # around the true simulated thyroid_status (Model 1's real AUC~0.995
-    # means it should track true status closely)
+    # Model 1 proba, noisy but informative given its real AUC~0.995
     model1_proba = np.clip(rng.normal(loc=thyroid_status * 0.85 + 0.05, scale=0.1, size=n_sim), 0, 1)
-    # Simulate Model 2's PCOS probability similarly, informed by Model 2b's real AUC~0.96
+    # Model 2b PCOS proba, noisy but informative given its real AUC~0.96
     model2_pcos_proba = np.clip(rng.normal(loc=pcos_status * 0.8 + 0.1, scale=0.15, size=n_sim), 0, 1)
-    # Model 3 criteria count roughly informed by simulated pcos_status
+    # Criteria count loosely informed by simulated pcos_status
     pcos_criteria_count = np.clip(rng.normal(loc=pcos_status * 2.0 + 0.3, scale=0.8, size=n_sim), 0, 3).round()
-    thyroid_criteria_call = thyroid_status  # assume rule-based call tracks true status here for simplicity
+    thyroid_criteria_call = thyroid_status  # assume rule-based call matches true status, for simplicity
 
     X_sim = pd.DataFrame({
         "model2_thyroid_proba": model1_proba,  # substituted, as the heuristic does

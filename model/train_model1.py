@@ -1,29 +1,11 @@
 """
-train_model1.py
-Step 4a of the Women's Hormonal Health ensemble model pipeline.
+Trains Model 1: XGBoost classifier on the full mixed-sex thyroid cohort,
+predicting thyroid_dysfunction. Cohort is 69% female (2182F/908M), so
+this is a generic baseline, not a "male-skewed" one.
 
-Trains Model 1: an XGBoost classifier trained on the FULL mixed-sex
-thyroid cohort, predicting thyroid_dysfunction.
-
-CORRECTION (post-review): earlier versions of this doc called this the
-"male-skewed" model. That name was wrong and never actually checked
-against the data -- this cohort is 2,182 women / 908 men (69% female),
-so "male-skewed" doesn't describe it. The accurate framing is: a
-GENERIC clinical model, trained without any deliberate attention to
-sex as a variable, using standard clinical features. Whether it
-actually performs worse for one sex is an empirical question -- see
-the sex-disaggregated evaluation at the bottom of main(), which we
-did NOT check before and should have.
-
-Model 2 (Step 4b) is trained on the PCOS cohort with a comparable
-target, so we can contrast performance on the SAME thyroid_dysfunction
-task -- but see robustness_checks.py for why that comparison alone
-conflates dataset size, label quality, and feature availability, and
-isn't a clean test of any sex-representation effect on its own.
-
-As discussed: this model structurally CANNOT predict PCOS -- no PCOS
-labels or features exist for a mixed-sex population. Model 1 abstains
-on that axis entirely.
+Comparable to Model 2 (same target, PCOS cohort) but not a clean
+sex-representation test alone -- dataset size/label quality/features differ.
+Cannot predict PCOS: no PCOS labels/features exist for this cohort.
 """
 
 import os
@@ -65,8 +47,7 @@ def main():
     X_val, y_val, _ = load_split("val")
     X_test, y_test, test_df = load_split("test")
 
-    # Class imbalance: ~4.8% positive. scale_pos_weight balances the
-    # gradient contributions instead of resampling the (small) dataset.
+    # ~4.8% positive; scale_pos_weight balances gradients instead of resampling.
     n_pos, n_neg = y_train.sum(), len(y_train) - y_train.sum()
     scale_pos_weight = n_neg / n_pos
     print(f"Train class balance: {n_neg} negative, {n_pos} positive (scale_pos_weight={scale_pos_weight:.2f})")
@@ -95,10 +76,8 @@ def main():
     pred_test = (proba_test >= 0.5).astype(int)
     print(classification_report(y_test, pred_test, target_names=["no dysfunction", "dysfunction"]))
 
-    # --- FIX (post-review, critique #1/#6): sex-disaggregated evaluation.
-    # We claimed a sex-representation story without ever checking whether
-    # Model 1 performs differently for men vs. women. Check it directly.
-    print("\n--- Sex-disaggregated test performance (added after review) ---")
+    # Check whether Model 1 performs differently for men vs. women.
+    print("\n--- Sex-disaggregated test performance ---")
     sex_metrics = {}
     for sex_label in ["female", "male"]:
         mask = (test_df["sex"] == sex_label).values
@@ -112,7 +91,6 @@ def main():
         print(f"    confusion matrix:\n{confusion_matrix(y_sub, pred_sub)}")
         sex_metrics[sex_label] = {"n": int(mask.sum()), "positives": int(y_sub.sum()), "auc": float(auc_sub)}
 
-    # Feature importance -- worth a look for the model card
     importances = pd.Series(model.feature_importances_, index=FEATURE_COLS).sort_values(ascending=False)
     print("\nFeature importances:")
     print(importances.to_string())

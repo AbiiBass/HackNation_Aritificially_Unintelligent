@@ -1,19 +1,12 @@
 """
 split.py
-Step 3 of the Women's Hormonal Health ensemble model pipeline.
-
 Splits both labeled cohorts into train/val/test (70/15/15), stratified by
-their target so rare classes stay represented in every split.
+target.
 
-IMPORTANT LEAKAGE NOTE (carries forward into Step 4):
-On the PCOS cohort, `thyroid_dysfunction` was constructed directly from
-`tsh` (see label_engineering.py). That means `tsh` can NOT be used as an
-input feature when predicting `thyroid_dysfunction` or `joint_class` on
-this cohort -- it would just be decoding the label, not predicting it.
-`tsh` is fine to use as a feature when predicting `pcos_diagnosis` alone
-(that label doesn't depend on it). This file only handles splitting; the
-feature-exclusion happens in train.py, but flagging it here since it's a
-direct consequence of how the split target is chosen.
+Leakage note: on the PCOS cohort, thyroid_dysfunction is derived from tsh,
+so tsh must not be used as a feature when predicting thyroid_dysfunction or
+joint_class (fine to use when predicting pcos_diagnosis alone). Feature
+exclusion happens in train.py.
 """
 
 import os
@@ -27,15 +20,15 @@ TRAIN_FRAC, VAL_FRAC, TEST_FRAC = 0.70, 0.15, 0.15
 
 
 def stratified_three_way_split(df: pd.DataFrame, stratify_col: str):
-    """70/15/15 split, stratified by stratify_col. Two-step: first peel off
-    train, then split the remainder into val/test."""
+    """70/15/15 split, stratified by stratify_col. First splits off train,
+    then splits the remainder into val/test."""
     train_df, rest_df = train_test_split(
         df,
         train_size=TRAIN_FRAC,
         stratify=df[stratify_col],
         random_state=RANDOM_STATE,
     )
-    # rest_df is 30% of data; split it 50/50 to get 15%/15% of the original
+    # rest_df is 30%; split 50/50 for 15%/15% of the original
     val_df, test_df = train_test_split(
         rest_df,
         train_size=VAL_FRAC / (VAL_FRAC + TEST_FRAC),
@@ -55,7 +48,7 @@ def report_split(name: str, train_df, val_df, test_df, stratify_col: str):
 def main():
     os.makedirs(SPLIT_DIR, exist_ok=True)
 
-    # --- PCOS cohort: stratify by the 4-class joint target ---
+    # PCOS cohort: stratify by the 4-class joint target
     pcos = pd.read_csv(os.path.join(DATA_DIR, "pcos_cohort_labeled.csv"))
     pcos_train, pcos_val, pcos_test = stratified_three_way_split(pcos, "joint_class")
     pcos_train.to_csv(os.path.join(SPLIT_DIR, "pcos_train.csv"), index=False)
@@ -63,7 +56,7 @@ def main():
     pcos_test.to_csv(os.path.join(SPLIT_DIR, "pcos_test.csv"), index=False)
     report_split("pcos", pcos_train, pcos_val, pcos_test, "joint_class")
 
-    # --- Thyroid cohort: stratify by the binary diagnosis ---
+    # Thyroid cohort: stratify by the binary diagnosis
     thyroid = pd.read_csv(os.path.join(DATA_DIR, "thyroid_cohort_labeled.csv"))
     thy_train, thy_val, thy_test = stratified_three_way_split(thyroid, "thyroid_dysfunction")
     thy_train.to_csv(os.path.join(SPLIT_DIR, "thyroid_train.csv"), index=False)

@@ -1,71 +1,38 @@
 """
 predict.py
-Step 7 of the Women's Hormonal Health ensemble model pipeline.
 
-The single function the rest of the system calls:
+Single entry point: `from predict import predict; result = predict(patient_dict)`.
 
-    from predict import predict
-    result = predict(patient_dict)
+patient_dict follows PatientInput (api.py) / TEMPLATE (pdf_to_json.py): 32
+fields, any may be missing/None. Each model runs only if every field it
+needs is present; otherwise it abstains (returns None + a reason).
 
-`patient_dict` follows the PatientInput schema (see api.py's PatientInput /
-pdf_to_json.py's TEMPLATE) -- 32 fields, ANY of which may be missing or None.
-That's expected, not an error: a doctor's PDF upload will often only have
-some of the fields a given model needs, and a hand-filled fallback form may
-leave others blank. Each model below only runs if every field IT needs is
-present; otherwise it abstains (returns None + a plain-English reason)
-instead of silently guessing with a default value. This is the `_has_keys`
-policy referenced in pdf_to_json.py and model_adapter.py's docstrings.
+Field requirements:
+  Model 1 (generic baseline, thyroid_dysfunction): full thyroid panel -
+      age, sex, pregnant, sick, tsh, t3, t4, t4_uptake, free_thyroxine_index.
+  Model 2 (women-only, thyroid_dysfunction): 25-field PCOS-cohort set
+      (demographics, cycle, symptoms, hormone panel, follicle/ultrasound
+      fields) -- no tsh, since that would leak the label.
+  Model 2b (women-only, pcos_diagnosis): same set plus tsh (no leakage
+      concern for this target).
+  Model 3 (Rotterdam + TSH threshold, rule-based, not trained): PCOS axis
+      needs cycle_regularity, hirsutism, lh, fsh, follicle_count_left/right;
+      thyroid axis needs tsh. The two axes score independently.
+  Meta-learner (4-way joint: neither/thyroid_only/pcos_only/both): needs
+      Model 2's thyroid proba, Model 2b's PCOS proba, and both Model 3
+      scores, so it only runs if all three ran. Trained on PCOS-cohort
+      features only, so Model 1 is excluded and reported separately
+      (see meta_learner.py).
 
-WHAT RUNS, AND WHEN
---------------------
-Model 1  (generic clinical baseline, thyroid_dysfunction)
-    needs: age, sex, pregnant, sick, tsh, t3, t4, t4_uptake, free_thyroxine_index
-    i.e. a FULL clinical thyroid panel. Most PCOS-style workups won't have
-    this -- that's the point being demonstrated, not a bug.
+Model 1 substitution: if both Model 1 and Model 2 ran, Model 1's thyroid
+estimate is more reliable (it sees T3/T4/T4U/FTI). The meta-learner still
+computes on Model 2's number (it was never trained with Model 1 as a
+feature), but the result is flagged `used_model1_for_thyroid_input=True`
+so model_adapter.py can show Model 1's number to the doctor instead.
 
-Model 2  (women-only, thyroid_dysfunction) and
-Model 2b (women-only, pcos_diagnosis)
-    both need the same 26-field PCOS-cohort feature set (age, bmi, cycle
-    info, symptom checklist, hormone panel, follicle/ultrasound fields).
-
-Model 3  (Rotterdam criteria + TSH threshold -- not trained, rule-based)
-    PCOS axis needs: cycle_regularity, hirsutism, lh, fsh,
-                      follicle_count_left, follicle_count_right
-    Thyroid axis needs: tsh
-    The two axes are scored independently, so a patient can get a PCOS
-    criteria score even with no TSH, or vice versa.
-
-Meta-learner (calibrated 4-way joint: neither / thyroid_only / pcos_only /
-both)
-    needs Model 2's thyroid proba + Model 2b's PCOS proba + BOTH of Model
-    3's scores -- i.e. it can only run if Model 2, Model 2b, and Model 3
-    (both axes) all ran. This mirrors exactly how meta_learner.py was
-    trained: on PCOS-cohort meta-features only. Model 1 is structurally
-    excluded from the meta-learner (see meta_learner.py's docstring) --
-    it is reported separately, never fed into the joint call.
-
-MODEL 1 SUBSTITUTION HEURISTIC (documented, not hidden):
-When a patient happens to have BOTH a full thyroid panel (Model 1 ran)
-AND enough PCOS-cohort fields (Model 2 ran), Model 1's thyroid estimate
-is clinically more reliable -- it sees T3/T4/T4U/FTI, which Model 2 never
-does. The meta-learner was never trained with Model 1 as an input feature
-(that data doesn't exist for the PCOS cohort), so we cannot literally
-splice its output into the meta-learner's math. What we DO is surface
-this to the doctor as an explicit warning and flag
-`used_model1_for_thyroid_input=True` on the joint result, so
-model_adapter.py can tell the UI "Model 1's number is the trustworthy one
-here, even though the joint class weights technically ran on Model 2's."
-
-SCHEMA RECONCILIATION NOTE:
-train_model1.py's `encode_features()` was written against the UCI
-hypothyroid dataset's raw encoding, where `pregnant`/`sick` are the
-literal strings "t"/"f". Everywhere else in this system (api.py's
-PatientInput, pdf_to_json.py's TEMPLATE) represents the same fields as
-0/1 integers, since that's a saner interface for callers. `_model1_row()`
-below is the one place that reconciles the two -- converts the 0/1 ints
-coming in at the boundary into the "t"/"f" strings `encode_features()`
-expects -- so that mismatch doesn't leak out and doesn't require touching
-the already-tested training script.
+Schema note: train_model1.py's encode_features() expects pregnant/sick as
+"t"/"f" strings (UCI dataset encoding); everywhere else uses 0/1 ints.
+_model1_row() converts between the two.
 """
 
 import os
@@ -80,26 +47,28 @@ from pipeline_common import CLASS_NAMES
 
 MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
 
-# --- field requirements, kept in one place and reused for both routing
-# and for the human-readable "missing fields" messages. Must stay in sync
-# with pdf_to_json.py's FIELDS_BY_MODEL. ---
+# Field lists reused for routing and "missing fields" messages.
+# Keep in sync with pdf_to_json.py's FIELDS_BY_MODEL.
 FIELDS_MODEL1 = ["age", "sex", "pregnant", "sick", "tsh", "t3", "t4", "t4_uptake", "free_thyroxine_index"]
 
-FIELDS_MODEL2_2B = [
+# Model 2 excludes tsh (using it would leak the label - the PCOS cohort's
+# thyroid_dysfunction target is derived from tsh, see train_model2.py).
+# Model 2b has no such leakage issue and does use tsh. Keep as two lists.
+FIELDS_MODEL2 = [
     "age", "bmi", "cycle_regularity", "cycle_length_days", "weight_gain",
     "hirsutism", "skin_darkening", "hair_loss", "acne", "fast_food",
     "regular_exercise", "bp_systolic", "bp_diastolic", "fsh", "lh",
     "fsh_lh_ratio", "amh", "prl", "vit_d3", "progesterone",
     "random_blood_sugar", "follicle_count_left", "follicle_count_right",
-    "avg_follicle_size_left", "avg_follicle_size_right", "endometrium_mm", "tsh",
+    "avg_follicle_size_left", "avg_follicle_size_right", "endometrium_mm",
 ]
+FIELDS_MODEL2B = FIELDS_MODEL2 + ["tsh"]
 
 FIELDS_MODEL3_PCOS = ["cycle_regularity", "hirsutism", "lh", "fsh",
                        "follicle_count_left", "follicle_count_right"]
 FIELDS_MODEL3_THYROID = ["tsh"]
 
-# Loaded once per process and reused -- these files don't change at runtime,
-# and joblib.load() is not free enough to redo on every request.
+# Cache loaded models per process; joblib.load() is expensive to repeat.
 _MODEL_CACHE = {}
 
 
@@ -115,23 +84,19 @@ def _missing_keys(patient: dict, keys) -> list:
 
 
 def _has_keys(patient: dict, keys) -> bool:
-    """A field that's present but None counts as missing -- we never want
-    a model trained on real labs silently treating "unknown" as a value."""
+    """A field present but None counts as missing, not a value."""
     return not _missing_keys(patient, keys)
 
 
 def _row(patient: dict) -> pd.DataFrame:
-    """Every helper this module reuses (clean_features_*, model3's scorers)
-    is written against a DataFrame/Series, so single-patient predict()
-    calls go through a one-row DataFrame rather than reimplementing that
-    logic per-field here."""
+    """Wraps a single patient dict as a one-row DataFrame for the shared
+    feature-prep helpers (clean_features_*, model3's scorers)."""
     return pd.DataFrame([patient])
 
 
 def _model1_row(patient: dict) -> pd.DataFrame:
-    """See module docstring: bridges the 0/1-int schema used everywhere
-    else in this system to the 't'/'f'-string schema train_model1.py's
-    encode_features() expects."""
+    """Converts pregnant/sick from 0/1 ints to 't'/'f' strings for
+    train_model1.py's encode_features()."""
     bridged = dict(patient)
     bridged["pregnant"] = "t" if patient.get("pregnant") == 1 else "f"
     bridged["sick"] = "t" if patient.get("sick") == 1 else "f"
@@ -139,8 +104,8 @@ def _model1_row(patient: dict) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# Individual model runners -- each one abstains cleanly if its fields
-# aren't present, and never raises for a missing/incomplete patient.
+# Model runners: each abstains if its required fields are missing, never
+# raises for a partial patient.
 # ---------------------------------------------------------------------------
 
 def _run_model1(patient: dict) -> dict:
@@ -159,9 +124,9 @@ def _run_model1(patient: dict) -> dict:
 
 
 def _run_model2_thyroid(patient: dict) -> dict:
-    if not _has_keys(patient, FIELDS_MODEL2_2B):
+    if not _has_keys(patient, FIELDS_MODEL2):
         return {"thyroid_dysfunction_proba": None,
-                "reason": f"missing fields: {', '.join(_missing_keys(patient, FIELDS_MODEL2_2B))}"}
+                "reason": f"missing fields: {', '.join(_missing_keys(patient, FIELDS_MODEL2))}"}
     model = _load("model2_women_only.joblib")
     if model is None:
         return {"thyroid_dysfunction_proba": None, "reason": "model2 artifact not found on disk"}
@@ -171,9 +136,9 @@ def _run_model2_thyroid(patient: dict) -> dict:
 
 
 def _run_model2b_pcos(patient: dict) -> dict:
-    if not _has_keys(patient, FIELDS_MODEL2_2B):
+    if not _has_keys(patient, FIELDS_MODEL2B):
         return {"pcos_proba": None,
-                "reason": f"missing fields: {', '.join(_missing_keys(patient, FIELDS_MODEL2_2B))}"}
+                "reason": f"missing fields: {', '.join(_missing_keys(patient, FIELDS_MODEL2B))}"}
     model = _load("model2b_women_only_pcos.joblib")
     if model is None:
         return {"pcos_proba": None, "reason": "model2b artifact not found on disk"}
@@ -183,10 +148,8 @@ def _run_model2b_pcos(patient: dict) -> dict:
 
 
 def _run_model3(patient: dict) -> dict:
-    """Both Rotterdam-criteria axes are scored independently, so a
-    patient missing TSH can still get a PCOS criteria count, and vice
-    versa -- unlike the trained models, there's no reason to require
-    the union of both fields sets here."""
+    """PCOS and thyroid axes are scored independently; missing one
+    doesn't block the other."""
     result = {"pcos_criteria_count": None, "pcos_rotterdam_call": None,
               "thyroid_criteria_call": None, "reason": None}
     reasons = []
@@ -210,9 +173,9 @@ def _run_model3(patient: dict) -> dict:
 
 
 def _run_joint(model1: dict, model2_thyroid: dict, model2b_pcos: dict, model3: dict) -> dict:
-    """The calibrated 4-way joint prediction. Only runs if Model 2, Model
-    2b, and BOTH Model 3 axes produced a value -- exactly the meta-feature
-    set meta_learner.py was trained on (see build_meta_features there)."""
+    """4-way joint prediction. Runs only if Model 2, Model 2b, and both
+    Model 3 axes produced values (matches meta_learner.py's training
+    features)."""
     missing = []
     if model2_thyroid.get("thyroid_dysfunction_proba") is None:
         missing.append("model2_thyroid_proba (Model 2 could not run)")
@@ -232,9 +195,8 @@ def _run_joint(model1: dict, model2_thyroid: dict, model2b_pcos: dict, model3: d
         return {"probabilities": None, "used_model1_for_thyroid_input": False,
                 "warning": None, "reason": "meta_learner artifact not found on disk"}
 
-    # Column NAME and ORDER must match meta_learner.py's build_meta_features()
-    # exactly -- sklearn's LogisticRegression.predict_proba does not re-sort
-    # a DataFrame's columns to match what it saw at fit time.
+    # Column names/order must match meta_learner.py's build_meta_features();
+    # sklearn won't re-sort them to match fit time.
     X_meta = pd.DataFrame([{
         "model2_thyroid_proba": model2_thyroid["thyroid_dysfunction_proba"],
         "model2_pcos_proba": model2b_pcos["pcos_proba"],
@@ -262,14 +224,10 @@ def _run_joint(model1: dict, model2_thyroid: dict, model2b_pcos: dict, model3: d
 
 
 def predict(patient: dict) -> dict:
-    """The one function the rest of the system calls.
-
-    Never raises on missing/partial input -- every field is optional, and
-    every model abstains (rather than guessing) when it doesn't have what
-    it needs. Returns a dict with keys: model1, model2_thyroid,
-    model2b_pcos, model3, joint. See module docstring for each key's shape.
+    """Never raises on missing/partial input. Returns a dict with keys:
+    model1, model2_thyroid, model2b_pcos, model3, joint.
     """
-    patient = dict(patient)  # never mutate the caller's dict
+    patient = dict(patient)  # don't mutate caller's dict
 
     model1_result = _run_model1(patient)
     model2_thyroid_result = _run_model2_thyroid(patient)
@@ -294,8 +252,7 @@ if __name__ == "__main__":
         with open(sys.argv[1]) as f:
             demo_patient = json.load(f)
     else:
-        # A patient with every field filled in, so a smoke test exercises
-        # every model AND the joint ensemble in one run.
+        # Fully filled-in patient; exercises every model plus the joint ensemble.
         demo_patient = {
             "age": 28, "bmi": 27.5, "cycle_regularity": 4, "cycle_length_days": 45,
             "weight_gain": 1, "hirsutism": 1, "skin_darkening": 1, "hair_loss": 1,

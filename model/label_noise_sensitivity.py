@@ -1,34 +1,13 @@
 """
-label_noise_sensitivity.py
-Post-review fix for critique #3.
+Monte Carlo sensitivity check: repeatedly "corrects" the PCOS cohort's
+TSH-proxy labels using the TSH rule's measured error rate (precision
+0.097, recall 0.993, FPR 0.462, measured on the real-diagnosis mixed-sex
+thyroid cohort), then sees how much Model 2's AUC and the meta-learner's
+accuracy move.
 
-We can't get a second, independently-labeled thyroid dataset for the
-PCOS cohort (that data doesn't exist in what's available to this
-project -- see the model card's "still unfixed" section). What we CAN
-do is use the TSH-only rule's known, measured error rate -- from
-comparing it against REAL diagnoses in the mixed-sex thyroid cohort --
-to bound how much the PCOS-cohort's reported metrics could shift if the
-proxy label were replaced with a true one.
-
-Measured on the full mixed-sex cohort (3,163 patients, real diagnoses):
-  precision = 0.097   (of everyone the TSH rule flags positive, ~90% are false alarms)
-  recall    = 0.993   (the rule almost never misses a real case)
-  FPR       = 0.462   (of everyone truly negative, ~46% get incorrectly flagged)
-
-CAVEAT (stated plainly, not hidden): these error rates come from a
-different population (older, mixed-sex, thyroid-referred patients) than
-the PCOS cohort (young women, PCOS-referred). Applying them to the PCOS
-cohort assumes the rule's error PATTERN transfers across populations,
-which is an assumption, not a validated fact. This analysis gives a
-plausible RANGE, not a corrected ground truth.
-
-Method: Monte Carlo. For each of the PCOS cohort's current TSH-proxy
-labels, probabilistically "correct" it using the measured error rates
-(a labeled positive gets flipped to negative with probability related
-to the measured false-discovery rate; a labeled negative gets flipped
-to positive at the measured miss rate), redraw many times, and see how
-much Model 2's AUC and the meta-learner's accuracy move under labels
-that are LESS likely to be pure TSH-threshold artifacts.
+Caveat: those error rates come from a different population (older,
+mixed-sex, thyroid-referred) than the PCOS cohort, so this gives a
+plausible range, not a corrected ground truth.
 """
 
 import os
@@ -46,18 +25,14 @@ MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
 MEASURED_PRECISION = 0.097
 MEASURED_RECALL = 0.993
 MEASURED_FPR = 0.462
-# False discovery rate: of labeled positives, this fraction are (by the
-# measured rule) actually false positives.
+# Fraction of labeled positives that are actually false positives
 FALSE_DISCOVERY_RATE = 1 - MEASURED_PRECISION
-# Miss rate: of labeled negatives, roughly this fraction could actually
-# be positives the rule failed to flag (derived from recall + typical
-# base rates; kept conservative/small since recall was measured high).
+# Fraction of labeled negatives that the rule likely missed
 MISS_RATE = 1 - MEASURED_RECALL
 
 
 def simulate_corrected_labels(current_labels: pd.Series, rng: np.random.RandomState) -> pd.Series:
-    """One Monte Carlo draw of 'what if some proxy labels were wrong,
-    at the rates measured on the real-diagnosis cohort'."""
+    """One Monte Carlo draw of the proxy labels, flipped at the measured error rates."""
     corrected = current_labels.copy()
     positive_idx = current_labels[current_labels == 1].index
     negative_idx = current_labels[current_labels == 0].index

@@ -1,7 +1,5 @@
 """
-Simple CSV-backed data access layer.
-Acts as the "database" for this demo app. Every function reads/writes
-directly to the CSV files under /data so no real DB setup is needed.
+CSV-backed data access layer. Acts as the "database" for this demo app.
 """
 import csv
 import os

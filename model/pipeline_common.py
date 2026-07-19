@@ -1,23 +1,10 @@
 """
 pipeline_common.py
-Shared logic used by multiple scripts in the pipeline, added post-review
-to fix several "defined in two places" bugs found during a full-file audit:
-
-- joint_class encoding was hand-duplicated in label_engineering.py and
-  label_noise_sensitivity.py. Now defined ONCE here.
-- XGBoost's default tree_method ('hist') isn't guaranteed bit-identical
-  across CPU architectures even with a fixed random_state -- this is why
-  meta_learner_metrics.json (0.866, built on x86_64 Linux) and a later
-  run of label_noise_sensitivity.py (0.878, run on ARM64 Mac) disagreed
-  on the exact same test set. XGBOOST_DETERMINISTIC_PARAMS below forces
-  tree_method='exact', which IS deterministic given the same data --
-  our datasets are small enough (max 3,163 rows) that the speed cost is
-  irrelevant. Import and use these params in every XGBClassifier(...) call.
-- save_json_with_metadata() stamps every generated report with a
-  timestamp + library versions, so staleness (like the old
-  robustness_checks.json missing a newly-added check) is detectable
-  just by looking at the file, not by memory of which script version
-  produced it.
+Shared helpers used across the pipeline: joint_class encode/decode (defined
+once here, not duplicated per-script), XGBOOST_DETERMINISTIC_PARAMS (forces
+tree_method='exact' since the default 'hist' isn't bit-identical across CPU
+architectures), and save_json_with_metadata (stamps reports with timestamp +
+library versions).
 """
 
 import json
@@ -27,17 +14,15 @@ from datetime import datetime, timezone
 
 CLASS_NAMES = {0: "neither", 1: "thyroid_only", 2: "pcos_only", 3: "both"}
 
-# XGBoost params to include in every XGBClassifier(...) call across the
-# project, to minimize (not eliminate -- see requirements.txt) cross-machine
-# result drift.
+# Include in every XGBClassifier(...) call to reduce cross-machine drift.
 XGBOOST_DETERMINISTIC_PARAMS = {
     "tree_method": "exact",
 }
 
 
 def encode_joint_class(pcos_diagnosis, thyroid_dysfunction):
-    """The ONE place this formula is defined. Works on scalars, pandas
-    Series, or numpy arrays (relies on * and + broadcasting normally)."""
+    """Single definition of the joint_class formula. Works on scalars,
+    pandas Series, or numpy arrays."""
     return pcos_diagnosis * 2 + thyroid_dysfunction
 
 
@@ -69,9 +54,8 @@ def _git_commit_if_available() -> str:
 
 
 def save_json_with_metadata(data: dict, path: str):
-    """Wraps any results dict with a metadata block before saving, so
-    anyone opening the file later can tell WHEN and on WHAT SETUP it was
-    generated -- catches staleness and cross-machine drift at a glance."""
+    """Wraps a results dict with a metadata block (timestamp, platform,
+    library versions, git commit)."""
     stamped = {
         "_metadata": {
             "generated_at_utc": datetime.now(timezone.utc).isoformat(),

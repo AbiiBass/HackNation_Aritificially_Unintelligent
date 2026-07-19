@@ -1,16 +1,12 @@
 """
 api.py
-Step 8 of the Women's Hormonal Health ensemble model pipeline.
 
-Wraps predict.py's predict() function in a FastAPI app with a /predict
-endpoint, so the application team (Person B) can call this as a
-microservice per the original plan.
+FastAPI wrapper around predict.py's predict(), exposed via /predict.
 
-Run locally with:
+Run locally:
     uvicorn api:app --reload --port 8000
 
-Then either open http://127.0.0.1:8000/docs for the interactive Swagger
-UI, or POST directly, e.g.:
+Then open http://127.0.0.1:8000/docs, or POST directly:
     curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{...}'
 """
 
@@ -31,7 +27,7 @@ app = FastAPI(
 
 
 class PatientInput(BaseModel):
-    # --- Model 2 / Model 2b / Model 3 fields (PCOS-cohort features) ---
+    # Model 2 / 2b / 3 fields (PCOS-cohort)
     age: Optional[float] = None
     bmi: Optional[float] = None
     cycle_regularity: Optional[int] = Field(None, description="2=regular, 4=irregular")
@@ -60,7 +56,7 @@ class PatientInput(BaseModel):
     endometrium_mm: Optional[float] = None
     tsh: Optional[float] = Field(None, description="mIU/L -- used by Models 2/2b/3")
 
-    # --- Model 1 fields (only needed if a full clinical thyroid panel exists) ---
+    # Model 1 fields (full thyroid panel)
     sex: Optional[str] = Field(None, description="'male' or 'female'")
     pregnant: Optional[int] = Field(None, description="0=No, 1=Yes")
     sick: Optional[int] = Field(None, description="0=No, 1=Yes")

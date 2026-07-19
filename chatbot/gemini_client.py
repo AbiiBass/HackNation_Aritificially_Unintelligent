@@ -1,19 +1,10 @@
 """
 Wrapper around Google's Gemini API (free tier via Google AI Studio).
+Requires GEMINI_API_KEY env var (or .env file, loaded via python-dotenv).
+Get a key at https://aistudio.google.com/apikey
 
-Get a free API key: https://aistudio.google.com/apikey  (no credit card needed)
-Set it as an environment variable before running the app:
-
-    export GEMINI_API_KEY="your-key-here"        (Mac/Linux)
-    setx GEMINI_API_KEY "your-key-here"           (Windows, new terminal after)
-
-or put it in a .env file in the project root (see .env.example) — the app
-loads it automatically via python-dotenv.
-
-Model: gemini-flash-latest — Google has retired gemini-2.5-flash/-lite for new
-API keys (404 "no longer available to new users"), so this always points at
-whatever the current default flash model is. If you hit quota errors, check
-https://aistudio.google.com for your project's live limits.
+Uses gemini-flash-latest: Google retired gemini-2.5-flash/-lite for new API
+keys, so this points at whatever the current default flash model is.
 """
 import logging
 import os
@@ -92,12 +83,10 @@ def is_configured():
 
 def get_reply(history, user_message):
     """
-    history: list of {"role": "user" | "model", "text": "..."} — prior turns
-             in this conversation (NOT including user_message).
-    user_message: the new message from the patient.
+    history: prior turns as {"role": "user"|"model", "text": ...}, not
+    including user_message.
 
-    Returns the assistant's reply text. Never raises — on any failure it
-    returns a friendly fallback string so the chat UI never breaks.
+    Never raises; returns a fallback string on failure.
     """
     client = _get_client()
     if client is None:
@@ -120,9 +109,8 @@ def get_reply(history, user_message):
                 system_instruction=SYSTEM_INSTRUCTION,
                 temperature=0.6,
                 max_output_tokens=800,
-                # gemini-flash-latest spends part of max_output_tokens on hidden
-                # "thinking" tokens before writing the reply, which was eating
-                # nearly the whole budget and cutting answers off mid-sentence.
+                # thinking_budget=0: model otherwise burns max_output_tokens on
+                # hidden "thinking", cutting replies off mid-sentence.
                 thinking_config=types.ThinkingConfig(thinking_budget=0),
             ),
         )
@@ -135,7 +123,7 @@ def get_reply(history, user_message):
         return text
 
     except Exception as e:
-        # Covers quota errors (429), bad API key, network issues, etc.
+        # quota errors, bad API key, network issues, etc.
         logger.exception("Gemini request failed")
         return (
             "Sorry, I couldn't process that just now (the AI service may be "
@@ -160,12 +148,8 @@ sign-off, or "summary:" label — output only the message body itself.
 
 def summarize_for_doctor(history):
     """
-    Builds a patient-voice summary of the conversation (history is the full
-    list of turns, including the latest one) suitable for pre-filling the
-    "Ask a Doctor" text box.
-
-    Returns None on failure so callers can fall back gracefully instead of
-    dropping an error string into the doctor's inbox.
+    Builds a patient-voice summary of the conversation for pre-filling the
+    "Ask a Doctor" text box. Returns None on failure.
     """
     client = _get_client()
     if client is None:

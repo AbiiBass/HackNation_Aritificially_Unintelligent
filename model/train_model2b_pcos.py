@@ -1,13 +1,9 @@
 """
-train_model2b_pcos.py
-Step 6a (added per request) -- fills the gap flagged after Model 3:
-Model 2 only had a thyroid-axis predictor so far. This trains its PCOS-axis
-counterpart: a women-only model predicting pcos_diagnosis directly.
+Trains Model 2b: women-only XGBoost classifier predicting pcos_diagnosis
+directly (PCOS-axis counterpart to Model 2's thyroid-axis predictor).
 
-No leakage concerns here (unlike the thyroid target): pcos_diagnosis
-wasn't derived from any of these features, so the full feature set is
-fair game -- including tsh, since thyroid dysfunction and PCOS are
-known comorbid conditions and TSH may carry real signal for PCOS risk.
+No leakage here: pcos_diagnosis wasn't derived from these features, so
+the full feature set including tsh is usable.
 """
 
 import os
@@ -30,13 +26,13 @@ FEATURE_COLS = [
     "fsh", "lh", "fsh_lh_ratio", "amh", "prl", "vit_d3", "progesterone",
     "random_blood_sugar", "follicle_count_left", "follicle_count_right",
     "avg_follicle_size_left", "avg_follicle_size_right", "endometrium_mm",
-    "tsh",  # fine here -- pcos_diagnosis wasn't built from this
+    "tsh",  # no leakage: pcos_diagnosis isn't derived from tsh
 ]
 
 
 def clean_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df.loc[df["cycle_regularity"] == 5, "cycle_regularity"] = 4  # same fix as Model 2
+    df.loc[df["cycle_regularity"] == 5, "cycle_regularity"] = 4  # remap stray value, as in Model 2
     return df[FEATURE_COLS]
 
 

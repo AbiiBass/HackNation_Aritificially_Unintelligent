@@ -1,24 +1,12 @@
 """
-train_model2.py
-Step 4b of the Women's Hormonal Health ensemble model pipeline.
+Trains Model 2, the "women-only" model: XGBoost classifier on the PCOS
+cohort (541 women), predicting thyroid_dysfunction (same target as Model 1,
+for direct comparison).
 
-Trains Model 2, the "women-only" model: an XGBoost classifier trained on
-the PCOS cohort (541 women), predicting the SAME target as Model 1
-(thyroid_dysfunction), so the two are directly comparable.
+Lacks T3/T4/T4U/FTI (not in this dataset) but has richer women's-health
+features (cycle regularity, hirsutism, BMI, follicle counts, etc.).
 
-The point of this comparison: Model 2 does NOT have access to T3, T4,
-T4U, or FTI -- the actual clinical thyroid panel that made Model 1 so
-accurate. Those labs simply don't exist in this dataset. What it DOES
-have is a much richer set of women's-health-context features (cycle
-regularity, hirsutism, BMI, follicle counts, etc.) that Model 1 never
-sees. This is meant to demonstrate, concretely, the "narrow women-only
-model missing the right diagnostic markers" problem from the hackathon
-brief -- not just assert it.
-
-LEAKAGE NOTE (carried from label_engineering.py / split.py): `tsh` is
-excluded from the feature set below because thyroid_dysfunction was
-constructed directly from it. Using it as a feature here would just be
-decoding the label, not predicting it.
+Leakage: `tsh` is excluded because thyroid_dysfunction was derived from it.
 """
 
 import os
@@ -34,8 +22,7 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data", "splits")
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
 TARGET = "thyroid_dysfunction"
 
-# Deliberately excludes tsh (leakage) and pcos_diagnosis/joint_class
-# (those are outcomes, not predictors, for this particular model).
+# Excludes tsh (leakage) and pcos_diagnosis/joint_class (outcomes, not predictors).
 FEATURE_COLS = [
     "age", "bmi", "cycle_regularity", "cycle_length_days",
     "weight_gain", "hirsutism", "skin_darkening", "hair_loss", "acne",
@@ -49,8 +36,7 @@ FEATURE_COLS = [
 def clean_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
-    # Fix the one stray cycle_regularity=5 value -> 4 (irregular), based on
-    # that patient's very short cycle_length_days=7. Documented, not hidden.
+    # cycle_regularity=5 is a stray value; remap to 4 (irregular).
     n_stray = (df["cycle_regularity"] == 5).sum()
     if n_stray:
         print(f"  [fix] cycle_regularity: remapped {n_stray} value(s) of 5 -> 4 (irregular)")
@@ -77,12 +63,10 @@ def main():
     scale_pos_weight = n_neg / n_pos
     print(f"Train class balance: {n_neg} negative, {n_pos} positive (scale_pos_weight={scale_pos_weight:.2f})")
 
-    # missing_value handles the 1 NaN in fast_food / amh natively (no
-    # separate imputation step needed -- XGBoost learns a split direction
-    # for missing values directly).
+    # XGBoost handles the 1 NaN in fast_food/amh natively; no imputation needed.
     model = xgb.XGBClassifier(
         n_estimators=200,
-        max_depth=3,          # shallower than Model 1: much smaller dataset (541 vs 3163)
+        max_depth=3,          # shallower: much smaller dataset (541 vs 3163)
         learning_rate=0.05,
         scale_pos_weight=scale_pos_weight,
         eval_metric="auc",

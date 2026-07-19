@@ -1,15 +1,7 @@
 """
-Lightweight, keyword-based safety net for the chatbot.
-
-This is a deliberately simple backup layer — it does NOT replace the system
-prompt instructions given to the model. Its only job is to guarantee that if
-a message contains a clear emergency or self-harm signal, the user sees a
-strong, unmissable safety message every single time, even if the model
-response is delayed, errors out, or (rarely) doesn't handle it perfectly.
-
-Keep this fast and conservative: it's fine to over-trigger occasionally
-(showing a safety banner when it wasn't strictly needed does no harm),
-it should never under-trigger on a clear signal.
+Keyword-based safety net for the chatbot. Backs up the model's system
+prompt: guarantees a safety banner shows on a clear self-harm/emergency
+signal even if the model misses it. Prefer over-triggering to under-triggering.
 """
 
 SELF_HARM_KEYWORDS = [
@@ -46,8 +38,7 @@ EMERGENCY_MESSAGE = (
 
 def check_safety_flags(message: str):
     """
-    Returns 'self_harm', 'emergency', or None based on simple keyword matching.
-    self_harm takes priority if both are present.
+    Returns 'self_harm', 'emergency', or None. self_harm takes priority.
     """
     lower = message.lower()
 

@@ -1,9 +1,7 @@
 """
-Women's Hormonal Health Platform — Flask application (Member 2's build)
+Flask app for the Women's Hormonal Health Platform.
 
-Run with:
-    python3 app.py
-Then open http://127.0.0.1:5000
+Run: python3 app.py, then open http://127.0.0.1:5000
 """
 import os
 import uuid
@@ -20,13 +18,13 @@ from utils import data_helpers as db
 from model import model_adapter
 from chatbot import gemini_client, safety
 
-load_dotenv()  # loads GEMINI_API_KEY from a .env file if present
+load_dotenv()  # loads GEMINI_API_KEY from .env
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_TMP_DIR = os.path.join(BASE_DIR, "data", "tmp_uploads")
 os.makedirs(UPLOAD_TMP_DIR, exist_ok=True)
 
-MAX_HISTORY_TURNS = 12  # cap stored turns so the session cookie doesn't grow unbounded
+MAX_HISTORY_TURNS = 12  # keeps the session cookie small (session data is stored client-side)
 
 app = Flask(__name__)
 app.secret_key = "hackathon-demo-secret-key-change-me"
@@ -128,7 +126,7 @@ def patient_records():
 @app.route("/download/<record_id>/<filename>")
 @login_required
 def download_record(record_id, filename):
-    # permission check: patients may only download their own records
+    # patients can only download their own records
     if session["role"] == "patient":
         records = db.get_records_for_patient(session["username"])
         if not any(r["record_id"] == record_id and r["filename"] == filename for r in records):
@@ -160,12 +158,10 @@ def chatbot_message():
 
     history = session.get("chat_history", [])
 
-    # Ask the model for a reply, using only prior turns as context.
     model_history = [{"role": h["role"], "text": h["text"]} for h in history]
     reply = gemini_client.get_reply(model_history, user_message)
 
-    # Safety net: guarantee a strong safety message on clear emergency /
-    # self-harm signals, regardless of what the model said.
+    # always show a safety banner on emergency/self-harm signals, regardless of the model's reply
     safety_flag = safety.check_safety_flags(user_message)
     if safety_flag:
         banner = safety.safety_banner_for(safety_flag)
@@ -279,7 +275,7 @@ def upload_record():
     )
     flash("Document uploaded successfully.", "success")
 
-    # re-run the search so the doctor sees the updated record list
+    # refresh the record list after upload
     records = db.get_records_for_patient(national_id)
     return render_template(
         "doctor_records.html", patient=patient, records=records, searched_id=national_id

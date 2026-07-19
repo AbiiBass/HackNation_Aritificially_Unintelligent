@@ -1,40 +1,32 @@
 """
 model_adapter.py
 
-The glue between the web app's PDF upload and the ensemble model.
+Glue between the web app's PDF upload and the ensemble model:
 
     web app --(PDF)--> analyze_pdf() --(dict)--> web app renders it
 
-analyze_pdf() is the ONE function app.py's study_analysis() route should
-call. It does three things, each already built separately:
+analyze_pdf() is the one function app.py's study_analysis() route calls:
 
     1. pdf_to_json.pdf_to_patient_json(pdf_path)  -- PDF -> PatientInput dict
     2. predict.predict(patient_dict)              -- PatientInput -> ensemble result
     3. _to_display(result)                        -- ensemble result -> UI shape
 
-Steps 1 and 2 already exist as their own tested modules (pdf_to_json.py,
-predict.py). This file only adds step 3 and the one-line orchestration,
-because nothing today converts predict()'s rich per-model dict into
-something study_analysis.html can render.
-
-OUTPUT CONTRACT (what the web app receives and should render):
+OUTPUT CONTRACT (what the web app receives and renders):
 {
   "diagnoses": [
       {"condition": str, "confidence": float in [0,1]},
-      ...  # sorted descending by confidence -- render row 0 as "Top Match"
+      ...  # sorted descending by confidence -- row 0 is "Top Match"
   ],
-  "summary": str,          # one paragraph, always present, always human-readable
-  "warnings": [str, ...],  # zero or more caveats to surface to the doctor
+  "summary": str,          # one paragraph, always present
+  "warnings": [str, ...],  # caveats to show the doctor
   "joint_available": bool, # True if the calibrated 4-way ensemble ran
 }
 
-This shape is intentionally stable regardless of which underlying models
-ran -- the web app template never needs to know whether it's looking at
-a full joint prediction or a partial fallback. It only ever reads
-diagnoses / summary / warnings.
+Shape stays the same regardless of which underlying models ran; the web
+app template only ever reads diagnoses / summary / warnings.
 """
 from pdf_to_json import pdf_to_patient_json
-from predict import predict
+from predict import predict, FIELDS_MODEL1, FIELDS_MODEL2B
 
 CONDITION_LABELS = {
     "neither": "Neither PCOS nor Thyroid Dysfunction",
@@ -42,6 +34,35 @@ CONDITION_LABELS = {
     "pcos_only": "PCOS Only",
     "both": "Both PCOS and Thyroid Dysfunction",
 }
+
+# Clinical names for fields, so doctors see "TSH" / "AMH", not internal keys.
+FIELD_LABELS = {
+    "age": "age", "bmi": "BMI", "cycle_regularity": "menstrual cycle regularity",
+    "cycle_length_days": "cycle length", "weight_gain": "weight gain history",
+    "hirsutism": "hirsutism", "skin_darkening": "skin darkening", "hair_loss": "hair loss",
+    "acne": "acne", "fast_food": "diet history", "regular_exercise": "exercise history",
+    "bp_systolic": "blood pressure", "bp_diastolic": "blood pressure",
+    "fsh": "FSH", "lh": "LH", "fsh_lh_ratio": "FSH/LH ratio", "amh": "AMH",
+    "prl": "prolactin", "vit_d3": "vitamin D", "progesterone": "progesterone",
+    "random_blood_sugar": "blood sugar", "follicle_count_left": "ovarian follicle count",
+    "follicle_count_right": "ovarian follicle count", "avg_follicle_size_left": "follicle size",
+    "avg_follicle_size_right": "follicle size", "endometrium_mm": "endometrial thickness",
+    "tsh": "TSH", "t3": "T3", "t4": "T4", "t4_uptake": "T4 uptake",
+    "free_thyroxine_index": "free thyroxine index", "sex": "sex",
+    "pregnant": "pregnancy status", "sick": "acute illness status",
+}
+
+
+def _missing_labels(patient: dict, keys) -> list:
+    """Clinical names for the fields in `keys` missing from `patient`,
+    de-duplicated, in order (e.g. ["TSH", "T3"])."""
+    labels = []
+    for k in keys:
+        if patient.get(k) is None:
+            label = FIELD_LABELS.get(k, k)
+            if label not in labels:
+                labels.append(label)
+    return labels
 
 
 def analyze_pdf(pdf_path: str) -> dict:
@@ -55,7 +76,7 @@ def _to_display(result: dict, patient: dict) -> dict:
     joint = result.get("joint") or {}
     warnings = []
 
-    # --- Case 1: the calibrated 4-way joint ensemble ran ---
+    # Case 1: full joint estimate available
     if joint.get("probabilities"):
         diagnoses = [
             {"condition": CONDITION_LABELS[name], "confidence": float(prob)}
@@ -65,18 +86,16 @@ def _to_display(result: dict, patient: dict) -> dict:
         top = diagnoses[0]
 
         summary = (
-            f"The ensemble model's strongest signal is '{top['condition']}' "
-            f"at {top['confidence'] * 100:.0f}% confidence, combining the "
-            f"women-only hormone model, Rotterdam clinical criteria, and "
-            f"(when available) the general thyroid model."
+            f"Most likely result: {top['condition']} ({top['confidence'] * 100:.0f}% likelihood). "
+            f"This is based on the patient's menstrual cycle and symptom history, hormone panel, "
+            f"and ultrasound findings, together with their thyroid lab results."
         )
 
         if joint.get("used_model1_for_thyroid_input"):
             warnings.append(
-                "This patient had a full thyroid panel available, so the general "
-                "thyroid model's (more reliable) output was substituted into the "
-                "ensemble in place of the women-only model's thyroid estimate. "
-                + (joint.get("warning") or "")
+                "This patient has a complete thyroid lab panel on file, so the thyroid result "
+                "above reflects those labs directly -- a more reliable read than estimating "
+                "thyroid risk from hormone and symptom data alone."
             )
 
         return {
@@ -86,11 +105,8 @@ def _to_display(result: dict, patient: dict) -> dict:
             "joint_available": True,
         }
 
-    # --- Case 2: joint ensemble couldn't run -- fall back to whichever
-    # individual models DID have enough data, and say plainly why the
-    # calibrated joint estimate isn't available. ---
+    # Case 2: fall back to individual model results, note what's missing
     diagnoses = []
-    missing_reasons = []
 
     thyroid_proba = None
     thyroid_source = None
@@ -98,12 +114,10 @@ def _to_display(result: dict, patient: dict) -> dict:
     m1 = result.get("model1") or {}
     if m1.get("thyroid_dysfunction_proba") is not None:
         thyroid_proba = m1["thyroid_dysfunction_proba"]
-        thyroid_source = "general thyroid model"
+        thyroid_source = "the patient's thyroid lab panel"
     elif m2t.get("thyroid_dysfunction_proba") is not None:
         thyroid_proba = m2t["thyroid_dysfunction_proba"]
-        thyroid_source = "women-only hormone model"
-    elif m2t.get("reason"):
-        missing_reasons.append(f"Thyroid Dysfunction: {m2t['reason']}")
+        thyroid_source = "hormone and symptom findings"
 
     if thyroid_proba is not None:
         diagnoses.append({"condition": "Thyroid Dysfunction", "confidence": float(thyroid_proba)})
@@ -111,35 +125,40 @@ def _to_display(result: dict, patient: dict) -> dict:
     m2b = result.get("model2b_pcos") or {}
     if m2b.get("pcos_proba") is not None:
         diagnoses.append({"condition": "PCOS", "confidence": float(m2b["pcos_proba"])})
-    elif m2b.get("reason"):
-        missing_reasons.append(f"PCOS: {m2b['reason']}")
 
     m3 = result.get("model3") or {}
     if m3.get("pcos_rotterdam_call") is not None:
+        count = m3["pcos_criteria_count"]
+        meets = m3["pcos_rotterdam_call"]
         warnings.append(
-            f"Rule-based Rotterdam criteria (not a probability): "
-            f"{m3['pcos_criteria_count']}/3 criteria met "
-            f"({'meets' if m3['pcos_rotterdam_call'] else 'does not meet'} the "
-            f">=2 threshold for a clinical PCOS call)."
+            f"By the Rotterdam clinical criteria, this patient meets {count} of 3 diagnostic "
+            f"criteria for PCOS -- {'this meets' if meets else 'this falls short of'} the "
+            f"standard threshold of 2 or more for a clinical PCOS call."
         )
 
     if diagnoses:
         diagnoses.sort(key=lambda d: d["confidence"], reverse=True)
-        source_note = f" (from the {thyroid_source})" if thyroid_source else ""
+        top = diagnoses[0]
+        missing = _missing_labels(patient, FIELDS_MODEL1) if thyroid_proba is None else []
+        missing += _missing_labels(patient, FIELDS_MODEL2B) if not m2b.get("pcos_proba") else []
+        missing_note = f" Missing from this document: {', '.join(missing)}." if missing else ""
         summary = (
-            "The full calibrated joint ensemble could not run for this patient "
-            "because some required fields were missing, so the results below are "
-            f"from individual models only{source_note}, not the validated joint estimate. "
-            + " ".join(missing_reasons)
+            f"A full combined PCOS/thyroid estimate wasn't possible because some information was "
+            f"missing from this document. Based on what was available, the strongest result is "
+            f"{top['condition']} at {top['confidence'] * 100:.0f}% likelihood, from {thyroid_source or 'the available findings'}."
+            f"{missing_note}"
         )
     else:
+        missing = _missing_labels(patient, FIELDS_MODEL1) + _missing_labels(patient, FIELDS_MODEL2B)
+        missing = list(dict.fromkeys(missing))
         diagnoses = [{"condition": "Unknown - Insufficient Data", "confidence": 0.0}]
         summary = (
-            "No model could produce a prediction for this patient -- required "
-            "fields were missing from the uploaded document. " + " ".join(missing_reasons)
+            "No result could be produced for this patient -- key information needed for either "
+            "the PCOS or thyroid assessment was missing from this document."
+            + (f" Missing: {', '.join(missing)}." if missing else "")
         )
 
-    warnings.insert(0, "Joint (combined PCOS x Thyroid) prediction unavailable -- see summary.")
+    warnings.insert(0, "A combined PCOS/thyroid estimate could not be generated -- see the result below.")
 
     return {
         "diagnoses": diagnoses,

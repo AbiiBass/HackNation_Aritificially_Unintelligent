@@ -1,42 +1,11 @@
 """
 data_prep.py
-Step 1 of the Women's Hormonal Health ensemble model pipeline.
+Loads and cleans two datasets: PCOS_data_without_infertility (Kaggle, 541
+women, real PCOS label + TSH on the same patients) and UCI Hypothyroid
+(~3160 patients, mixed sex, real diagnosis label, generic baseline).
 
-SOURCING DECISION (updated from the original NHANES-only plan):
-NHANES turned out to be a dead end for this project -- CDC discontinued
-the Thyroid Profile component after 2011-2012, so there's no cycle where
-thyroid labs and a useful PCOS-relevant hormone panel exist on the same
-people. Instead we use two REAL, LABELED, purpose-built datasets:
-
-1. PCOS_data_without_infertility (Kaggle, Kottarathil / Prasoon, sourced
-   from 10 hospitals in Kerala, India; 541 women, 44 features).
-   - Has a real clinician-assigned "PCOS (Y/N)" label.
-   - ALSO has "TSH (mIU/L)" measured on the same patients -- so we get
-     real joint (PCOS x thyroid) signal from ONE cohort, instead of
-     stitching together two populations that never overlap.
-   - Official source: https://www.kaggle.com/datasets/prasoonkottarathil/polycystic-ovary-syndrome-pcos
-   - This script falls back to a GitHub mirror of the same file if you
-     haven't downloaded it yourself (see DOWNLOAD NOTES below).
-
-2. UCI "Hypothyroid" dataset (aka Garvan Institute thyroid data), ~3,160
-   patients, MIXED SEX, with a real hypothyroid/negative diagnosis label.
-   - This is our stand-in for "male-skewed": it's a generic, sex-blind
-     thyroid model trained on a population that is NOT female-specific,
-     representing the historical baseline these tools were built on.
-   - Official source: https://archive.ics.uci.edu/dataset/102/thyroid+disease
-     (the "hypothyroid.csv" variant specifically)
-
-DOWNLOAD NOTES:
-- Best practice for your final submission: download both datasets
-  yourself from the official links above and cite them properly in your
-  docs. Kaggle requires a free account + API token (kaggle.json) to
-  download via code, or you can just click "Download" in the browser.
-- For convenience during development, this script will automatically
-  fall back to fetching a GitHub-hosted mirror of each file if it can't
-  find a local copy in data/raw/. Mirrors are useful for prototyping but
-  aren't a citable source -- swap in the official download before your
-  final submission.
-------------------------------------------------------------------------
+Falls back to a GitHub mirror if local files aren't in data/raw/ -- not
+citable, use the official source for final submission.
 """
 
 import os
@@ -63,8 +32,7 @@ THYROID_MIRROR_URL = (
     "SGMM_Class_Imbalance/master/hypothyroid.csv"
 )
 
-# The official UCI .data file has NO header row -- columns are documented
-# but not present in the file itself. This is the fixed column order.
+# UCI .data file has no header row; this is the fixed column order.
 THYROID_UCI_COLUMNS = [
     "diagnosis", "age", "sex", "on_thyroxine", "query_on_thyroxine",
     "on_antithyroid_medication", "thyroid_surgery", "query_hypothyroid",
@@ -96,7 +64,7 @@ def _fetch_bytes(url: str) -> bytes:
 
 
 # ----------------------------------------------------------------------
-# 1. PCOS cohort (real PCOS label + TSH, same patients)
+# PCOS cohort (real PCOS label + TSH, same patients)
 # ----------------------------------------------------------------------
 def load_pcos_raw() -> pd.DataFrame:
     local = _find_local(PCOS_LOCAL_CANDIDATES)
@@ -113,11 +81,10 @@ def load_pcos_raw() -> pd.DataFrame:
 
 def clean_pcos(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    # Strip whitespace from column names -- the source file is inconsistent
-    # about leading/trailing spaces (e.g. " Age (yrs)", "Height(Cm) ")
+    # Strip whitespace from column names (source file has inconsistent spacing)
     df.columns = [c.strip() for c in df.columns]
 
-    # Drop the stray unnamed trailing column and ID columns we don't need
+    # Drop unused unnamed/ID columns
     df = df.drop(columns=[c for c in df.columns if c.startswith("Unnamed")], errors="ignore")
     df = df.drop(columns=["Sl. No", "Patient File No."], errors="ignore")
 
@@ -127,7 +94,7 @@ def clean_pcos(df: pd.DataFrame) -> pd.DataFrame:
         "Weight (Kg)": "weight_kg",
         "Height(Cm)": "height_cm",
         "BMI": "bmi",
-        "Cycle(R/I)": "cycle_regularity",       # 2 = regular, 4 = irregular (per source coding)
+        "Cycle(R/I)": "cycle_regularity",       # 2 = regular, 4 = irregular
         "Cycle length(days)": "cycle_length_days",
         "FSH(mIU/mL)": "fsh",
         "LH(mIU/mL)": "lh",
@@ -155,17 +122,17 @@ def clean_pcos(df: pd.DataFrame) -> pd.DataFrame:
     }
     df = df.rename(columns=rename_map)
 
-    # AMH sometimes arrives as strings (source data quirk) -- coerce to numeric
+    # AMH sometimes arrives as strings -- coerce to numeric
     for col in ["amh", "tsh", "fsh", "lh"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    df["sex"] = "female"  # entire cohort is female by construction
+    df["sex"] = "female"  # entire cohort is female
     return df.reset_index(drop=True)
 
 
 # ----------------------------------------------------------------------
-# 2. Mixed-sex thyroid cohort (male-skewed baseline)
+# Mixed-sex thyroid cohort
 # ----------------------------------------------------------------------
 def load_thyroid_raw() -> pd.DataFrame:
     local = _find_local(THYROID_LOCAL_CANDIDATES)
@@ -179,18 +146,17 @@ def load_thyroid_raw() -> pd.DataFrame:
     text = raw_bytes.decode("utf-8", errors="ignore")
     lines = [l for l in text.splitlines() if l.strip()]
 
-    # Two possible formats we might see:
-    #  (a) official UCI .data: no header, no comments, just data rows
-    #  (b) some mirrors: '#'-comment block, then a header line, then data
+    # Two possible formats: (a) UCI .data -- no header; (b) mirrors -- comment
+    # block then a header line
     non_comment_lines = [l for l in lines if not l.strip().startswith("#")]
     first_field = non_comment_lines[0].split(",")[0].strip().lower()
 
     if first_field == "diagnosis":
-        # format (b): first non-comment line IS the header
+        # format (b): header present
         csv_text = "\n".join(non_comment_lines)
         df = pd.read_csv(io.StringIO(csv_text), sep=r"\s*,\s*", engine="python")
     else:
-        # format (a): no header anywhere -- assign the known UCI column order
+        # format (a): no header, use known UCI column order
         csv_text = "\n".join(non_comment_lines)
         df = pd.read_csv(
             io.StringIO(csv_text), sep=r"\s*,\s*", engine="python",

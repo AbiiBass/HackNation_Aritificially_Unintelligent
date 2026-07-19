@@ -1,36 +1,26 @@
 """
 pdf_to_json.py
 
-Converts an uploaded lab/screening PDF into the exact structured JSON object
-api.py's PatientInput / predict.py's predict() expect -- so this script is
-the missing link between doctor_records.html's PDF upload and the real
-ensemble model.
+Extracts an uploaded lab/screening PDF into the JSON shape api.py's
+PatientInput / predict.py's predict() expect.
 
 USAGE
     python3 pdf_to_json.py sample_patient_workup.pdf
     python3 pdf_to_json.py sample_patient_workup.pdf --out patient_123.json
 
-STRATEGY -- fully offline, no API keys, no network calls
-    pdfplumber pulls text + tables out of the PDF locally, then a set of
-    regex patterns pattern-matches the table rows and checklist lines that
-    generate_sample_pdfs.py / generate_sample_lab_pdf.py produce (plus a
-    handful of common synonyms), mapping each one onto the PatientInput
-    schema. Nothing here calls Gemini or any other external service.
+Fully offline, no network calls: pdfplumber extracts text/tables, then
+regexes match the table rows and checklist lines produced by
+generate_sample_pdfs.py / generate_sample_lab_pdf.py (plus common
+synonyms) onto the PatientInput schema.
 
-The result merges over an all-null template: whatever is found gets filled
-in, everything else stays null. predict.py's _has_keys() already treats a
-null/missing field as "abstain, don't guess", so a partial extraction is
-always safe to hand to the model as-is.
+Unmatched fields stay null over the template; predict.py's _has_keys()
+treats null as "abstain", so a partial extraction is always safe to use.
 
-TRADE-OFF vs. an LLM-based extractor: this only recognizes the label
-wording it has a pattern for. If a hospital's report uses different test
-names, header phrasing, or layout than the samples here, add a pattern to
-NUMERIC_TEST_PATTERNS / YES_NO_FIELD_PATTERNS below rather than expecting
-it to "just work" the way an LLM extractor would generalize automatically.
+Limitation: only recognizes label wording it has a pattern for. For other
+formats, add a pattern to NUMERIC_TEST_PATTERNS / YES_NO_FIELD_PATTERNS.
 
-The script also prints which of the 32 fields came back non-null, grouped
-by which downstream model they feed -- this is exactly the list you'd show
-a doctor as "fields to fill in the fallback form".
+Also prints which of the 32 fields came back non-null, grouped by which
+downstream model needs them.
 """
 import argparse
 import json
@@ -38,9 +28,7 @@ import re
 
 import pdfplumber
 
-# ---------------------------------------------------------------------------
-# The canonical schema -- must stay in sync with api.py's PatientInput.
-# ---------------------------------------------------------------------------
+# Canonical schema; keep in sync with api.py's PatientInput.
 TEMPLATE = {
     "age": None,
     "bmi": None,
@@ -79,7 +67,16 @@ TEMPLATE = {
 }
 
 FIELDS_BY_MODEL = {
-    "Model 2 / Model 2b (women-only, PCOS-cohort)": [
+    # Model 2 excludes tsh (see predict.py's FIELDS_MODEL2); Model 2b includes it.
+    "Model 2 (women-only, PCOS-cohort, thyroid_dysfunction)": [
+        "age", "bmi", "cycle_regularity", "cycle_length_days", "weight_gain",
+        "hirsutism", "skin_darkening", "hair_loss", "acne", "fast_food",
+        "regular_exercise", "bp_systolic", "bp_diastolic", "fsh", "lh",
+        "fsh_lh_ratio", "amh", "prl", "vit_d3", "progesterone",
+        "random_blood_sugar", "follicle_count_left", "follicle_count_right",
+        "avg_follicle_size_left", "avg_follicle_size_right", "endometrium_mm",
+    ],
+    "Model 2b (women-only, PCOS-cohort, pcos_diagnosis)": [
         "age", "bmi", "cycle_regularity", "cycle_length_days", "weight_gain",
         "hirsutism", "skin_darkening", "hair_loss", "acne", "fast_food",
         "regular_exercise", "bp_systolic", "bp_diastolic", "fsh", "lh",
