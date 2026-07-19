@@ -23,11 +23,17 @@
                     </h6>
                     <p class="text-muted small mb-2">Submitted {{ q.date_submitted }}</p>
                 </div>
-                {% if q.status == 'Pending' %}
-                    <span class="badge bg-secondary">Pending</span>
-                {% else %}
-                    <span class="badge bg-success">Answered</span>
-                {% endif %}
+                <div class="text-end">
+                    {% if q.status == 'Pending' %}
+                        <span class="badge bg-secondary d-block mb-2">Pending</span>
+                    {% else %}
+                        <span class="badge bg-success d-block mb-2">Answered</span>
+                    {% endif %}
+                    <a href="{{ url_for('doctor_patient_records', national_id=q.national_id) }}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-folder2-open"></i> View Patient Records
+                    </a>
+                </div>
             </div>
 
             <p class="mb-3"><strong>Question:</strong> {{ q.question }}</p>

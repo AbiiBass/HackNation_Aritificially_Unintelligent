@@ -175,7 +175,11 @@ def chatbot_message():
     history.append({"role": "model", "text": reply})
     session["chat_history"] = history[-(MAX_HISTORY_TURNS * 2):]
 
-    return jsonify({"reply": reply, "safety_flag": safety_flag})
+    return jsonify({
+        "reply": reply,
+        "safety_flag": safety_flag,
+        "offer_summary": bool(safety_flag),
+    })
 
 
 @app.route("/chatbot/reset", methods=["POST"])
@@ -183,6 +187,22 @@ def chatbot_message():
 def chatbot_reset():
     session["chat_history"] = []
     return jsonify({"status": "ok"})
+
+
+@app.route("/chatbot/summarize-for-doctor", methods=["POST"])
+@role_required("patient")
+def chatbot_summarize_for_doctor():
+    history = session.get("chat_history", [])
+    model_history = [{"role": h["role"], "text": h["text"]} for h in history]
+
+    if not model_history:
+        return jsonify({"error": "There's no conversation yet to summarize."}), 400
+
+    summary = gemini_client.summarize_for_doctor(model_history)
+    if not summary:
+        return jsonify({"error": "Couldn't generate a summary right now. Please write your question manually."}), 502
+
+    return jsonify({"summary": summary})
 
 
 @app.route("/ask-doctor", methods=["POST"])
@@ -208,6 +228,10 @@ def doctor_patient_records():
 
     if request.method == "POST":
         searched_id = request.form.get("national_id", "").strip()
+    else:
+        searched_id = request.args.get("national_id", "").strip()
+
+    if searched_id:
         patient = db.get_patient(searched_id)
         if patient:
             records = db.get_records_for_patient(searched_id)
@@ -266,23 +290,54 @@ def upload_record():
 @role_required("doctor")
 def study_analysis():
     result = None
+    searched_id = request.args.get("national_id", "").strip()
+    patient_records = db.get_records_for_patient(searched_id) if searched_id else []
 
     if request.method == "POST":
-        file = request.files.get("document")
-        if not file or file.filename == "" or not allowed_file(file.filename):
-            flash("Please upload a valid PDF file for analysis.", "danger")
-            return redirect(url_for("study_analysis"))
+        source = request.form.get("source", "upload")
 
-        temp_path = os.path.join(UPLOAD_TMP_DIR, f"{uuid.uuid4().hex}.pdf")
-        file.save(temp_path)
+        if source == "record":
+            record_id = request.form.get("record_id", "").strip()
+            record = db.get_record_by_id(record_id)
+            searched_id = request.form.get("national_id", "").strip()
+            patient_records = db.get_records_for_patient(searched_id) if searched_id else []
 
-        try:
-            result = model_adapter.analyze_pdf(temp_path)
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+            if not record:
+                flash("Please select a patient record to analyze.", "danger")
+                return render_template(
+                    "study_analysis.html", result=result,
+                    searched_id=searched_id, patient_records=patient_records,
+                )
 
-    return render_template("study_analysis.html", result=result)
+            pdf_path = db.get_record_file_path(record["filename"])
+            if not os.path.exists(pdf_path):
+                flash("That record's file could not be found on disk.", "danger")
+                return render_template(
+                    "study_analysis.html", result=result,
+                    searched_id=searched_id, patient_records=patient_records,
+                )
+
+            result = model_adapter.analyze_pdf(pdf_path)
+
+        else:
+            file = request.files.get("document")
+            if not file or file.filename == "" or not allowed_file(file.filename):
+                flash("Please upload a valid PDF file for analysis.", "danger")
+                return redirect(url_for("study_analysis"))
+
+            temp_path = os.path.join(UPLOAD_TMP_DIR, f"{uuid.uuid4().hex}.pdf")
+            file.save(temp_path)
+
+            try:
+                result = model_adapter.analyze_pdf(temp_path)
+            finally:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+
+    return render_template(
+        "study_analysis.html", result=result,
+        searched_id=searched_id, patient_records=patient_records,
+    )
 
 
 @app.route("/doctor/answer-help", methods=["GET"])

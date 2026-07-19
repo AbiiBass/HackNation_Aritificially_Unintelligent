@@ -76,6 +76,13 @@ def get_record_file_path(filename):
     return os.path.join(RECORDS_FILES_DIR, filename)
 
 
+def get_record_by_id(record_id):
+    for row in _read_csv(RECORDS_CSV):
+        if row["record_id"] == record_id:
+            return row
+    return None
+
+
 def add_record(national_id, patient_name, hospital, record_type, record_date,
                 filename, uploaded_by, description):
     fieldnames = ["record_id", "national_id", "patient_name", "hospital",

@@ -143,3 +143,49 @@ def get_reply(history, user_message):
             "moment, or use the 'Ask a Doctor' box if it's urgent. "
             f"[{type(e).__name__}]"
         )
+
+
+SUMMARY_SYSTEM_INSTRUCTION = """You write short, factual summaries of a patient's
+chat with an AI health assistant, to be sent to the patient's doctor via an
+"Ask a Doctor" message box.
+
+Write in first person, as if the patient is writing it themselves (e.g.
+"I've been experiencing..."). Include the key symptoms, concerns, and any
+relevant details (timing, severity, what's changed) the patient mentioned.
+Do not add a diagnosis, medical opinion, or advice — just summarize what the
+patient said. Keep it to one short paragraph. Do not include a greeting,
+sign-off, or "summary:" label — output only the message body itself.
+"""
+
+
+def summarize_for_doctor(history):
+    """
+    Builds a patient-voice summary of the conversation (history is the full
+    list of turns, including the latest one) suitable for pre-filling the
+    "Ask a Doctor" text box.
+
+    Returns None on failure so callers can fall back gracefully instead of
+    dropping an error string into the doctor's inbox.
+    """
+    client = _get_client()
+    if client is None:
+        return None
+
+    transcript = "\n".join(f"{h['role']}: {h['text']}" for h in history)
+
+    try:
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=f"Conversation to summarize:\n\n{transcript}",
+            config=types.GenerateContentConfig(
+                system_instruction=SUMMARY_SYSTEM_INSTRUCTION,
+                temperature=0.3,
+                max_output_tokens=300,
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
+            ),
+        )
+        text = (response.text or "").strip()
+        return text or None
+    except Exception:
+        logger.exception("Gemini summarize-for-doctor request failed")
+        return None

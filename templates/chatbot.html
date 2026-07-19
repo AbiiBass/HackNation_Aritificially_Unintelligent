@@ -63,8 +63,12 @@
             </div>
             <div class="card-body">
                 <p class="text-muted small">If you'd rather speak to a real person, send your question straight to your care team.</p>
+                <button type="button" id="summarizeChatBtn" class="btn btn-sm btn-outline-primary mb-2"
+                        {% if not chat_history %}disabled title="Chat with the assistant first so there's something to summarize"{% endif %}>
+                    <i class="bi bi-magic"></i> Summarize my chat &amp; fill this in
+                </button>
                 <form method="POST" action="{{ url_for('ask_doctor') }}">
-                    <textarea class="form-control mb-3" name="question" rows="3" placeholder="Type your question here..." required></textarea>
+                    <textarea id="askDoctorText" class="form-control mb-3" name="question" rows="3" placeholder="Type your question here..." required></textarea>
                     <button type="submit" class="btn btn-app-primary w-100">
                         <i class="bi bi-send"></i> Send to a Doctor
                     </button>
@@ -112,6 +116,19 @@
     const chatInput = document.getElementById('chatInput');
     const chatSendBtn = document.getElementById('chatSendBtn');
     const resetChatBtn = document.getElementById('resetChatBtn');
+    const summarizeChatBtn = document.getElementById('summarizeChatBtn');
+    const askDoctorText = document.getElementById('askDoctorText');
+
+    async function fetchDoctorSummary() {
+        const res = await fetch("{{ url_for('chatbot_summarize_for_doctor') }}", { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.error || 'Something went wrong generating the summary.');
+        }
+        askDoctorText.value = data.summary;
+        askDoctorText.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        askDoctorText.focus();
+    }
 
     function appendMessage(text, role) {
         const div = document.createElement('div');
@@ -130,6 +147,57 @@
         chatWindow.scrollTop = chatWindow.scrollHeight;
         return div;
     }
+
+    function appendSummaryOffer() {
+        const div = document.createElement('div');
+        div.className = 'chat-message bot-message align-self-start summary-offer';
+        div.innerHTML =
+            'Would you like me to summarize this conversation and send it to your doctor? ' +
+            'I can fill it into the "Ask a Doctor" box for you to review before sending.' +
+            '<div class="mt-2 d-flex gap-2">' +
+            '<button type="button" class="btn btn-sm btn-app-primary summary-yes-btn">Yes, please</button>' +
+            '<button type="button" class="btn btn-sm btn-outline-secondary summary-no-btn">No thanks</button>' +
+            '</div>';
+        chatWindow.appendChild(div);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+        return div;
+    }
+
+    chatWindow.addEventListener('click', async function (e) {
+        if (e.target.classList.contains('summary-no-btn')) {
+            const offerEl = e.target.closest('.summary-offer');
+            offerEl.innerHTML = 'No worries — I\'m here if you change your mind.';
+            return;
+        }
+
+        if (e.target.classList.contains('summary-yes-btn')) {
+            const offerEl = e.target.closest('.summary-offer');
+            offerEl.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            offerEl.querySelector('.summary-yes-btn').textContent = 'Summarizing...';
+
+            try {
+                await fetchDoctorSummary();
+                offerEl.innerHTML = 'I\'ve filled a summary into the "Ask a Doctor" box — feel free to edit it, then send it whenever you\'re ready.';
+            } catch (err) {
+                offerEl.innerHTML = err.message || 'Network error — please try again, or write your question to the doctor manually.';
+            }
+        }
+    });
+
+    summarizeChatBtn.addEventListener('click', async function () {
+        const originalHtml = summarizeChatBtn.innerHTML;
+        summarizeChatBtn.disabled = true;
+        summarizeChatBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Summarizing...';
+
+        try {
+            await fetchDoctorSummary();
+        } catch (err) {
+            alert(err.message || 'Something went wrong generating the summary. Please try again.');
+        }
+
+        summarizeChatBtn.disabled = false;
+        summarizeChatBtn.innerHTML = originalHtml;
+    });
 
     chatForm.addEventListener('submit', async function (e) {
         e.preventDefault();
@@ -157,6 +225,11 @@
                 if (data.safety_flag) {
                     msgEl.classList.add('safety-alert');
                 }
+                if (data.offer_summary) {
+                    appendSummaryOffer();
+                }
+                summarizeChatBtn.disabled = false;
+                summarizeChatBtn.removeAttribute('title');
             } else {
                 appendMessage(data.error || 'Something went wrong. Please try again.', 'model');
             }
@@ -175,6 +248,8 @@
         await fetch("{{ url_for('chatbot_reset') }}", { method: 'POST' });
         chatWindow.innerHTML = '';
         appendMessage("Conversation cleared. What would you like to talk about?", 'model');
+        summarizeChatBtn.disabled = true;
+        summarizeChatBtn.title = "Chat with the assistant first so there's something to summarize";
     });
 </script>
 {% endblock %}
