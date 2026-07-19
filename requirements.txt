@@ -1,0 +1,22 @@
+Flask==3.0.3
+Werkzeug==3.0.3
+pdfplumber==0.11.4
+reportlab==4.2.2
+google-genai>=1.0.0
+python-dotenv==1.0.1
+
+# model/ dependencies
+# scikit-learn and xgboost floors are set to match the versions the
+# committed model/models/*.joblib artifacts were actually trained with
+# (see each model's _metadata.library_versions in models/*_metrics.json)
+# -- an older scikit-learn can't even unpickle the meta-learner's
+# LogisticRegression (AttributeError on load), so this floor isn't
+# cosmetic.
+numpy==1.26.4
+pandas==2.2.2
+scikit-learn>=1.8.0
+xgboost>=3.3.0
+joblib==1.4.2
+# model/api.py (optional standalone microservice wrapper)
+fastapi==0.115.0
+uvicorn==0.30.6

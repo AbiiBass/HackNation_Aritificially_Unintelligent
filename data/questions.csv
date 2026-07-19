@@ -1,0 +1,7 @@
+question_id,national_id,patient_name,question,date_submitted,status,answer,answered_by,date_answered
+Q001,P001,Sarah Johnson,"My cycle has been irregular for the last 3 months, should I be worried?",2025-06-01,Answered,Irregular cycles for 3 months warrant a follow-up hormone panel. I have scheduled one for your next visit.,Dr. Lisa Tran,2025-06-02
+Q002,P003,Emily Chen,"I've been having bad migraines around my period, is this related to hormones?",2025-06-10,Pending,,,
+Q003,P005,Maria Silva,Can you explain what my last lab report results mean?,2025-06-15,Pending,,,
+Q004,P004,Grace Okafor,Are the hot flashes I am experiencing normal for my age?,2025-05-28,Answered,"Yes, this is a common menopause symptom. Let us discuss management options at your next appointment.",Dr. Nadia Hassan,2025-05-29
+QAE7E2A,P005,Maria Silva,"I am writing to report that I am experiencing severe abdominal pain, recently fainted, and am now having trouble breathing.",2026-07-19,Pending,,,
+Q4C6BA7,P001,Sarah Johnson,"I am writing to report that I am experiencing severe abdominal pain and have been vomiting blood, and I need urgent medical evaluation for these symptoms.",2026-07-19,Pending,,,

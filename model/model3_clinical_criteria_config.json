@@ -1,0 +1,9 @@
+{
+  "tsh_low_hyperthyroid": 0.4,
+  "tsh_high_hypothyroid": 4.5,
+  "lh_fsh_ratio_threshold": 2.0,
+  "follicle_count_threshold": 12,
+  "amh_elevated_threshold": 5.0,
+  "pcos_rotterdam_min_criteria": 2,
+  "notes": "follicle_count_threshold uses 2003 Rotterdam per-ovary counting; amh_elevated_threshold added per the 2023 guideline update as an ultrasound alternative (approximate, not a single standardized cutoff). Kept in sync with model3.py's constants -- see model/models/model3_config.json for the machine-generated copy of this same config."
+}

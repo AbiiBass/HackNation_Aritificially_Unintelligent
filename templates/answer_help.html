@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Answer Help — WHH Platform{% endblock %}
+
+{% block content %}
+<h2 class="fw-bold mb-1"><i class="bi bi-question-circle"></i> Answer Help</h2>
+<p class="text-muted mb-4">Questions submitted by patients through the chatbot. Pending questions are shown first.</p>
+
+{% set pending_count = questions|selectattr('status', 'equalto', 'Pending')|list|length %}
+<div class="mb-3">
+    <span class="badge bg-secondary fs-6 me-2">{{ pending_count }} Pending</span>
+    <span class="badge bg-success fs-6">{{ questions|length - pending_count }} Answered</span>
+</div>
+
+{% if questions %}
+    {% for q in questions %}
+    <div class="card shadow-sm mb-3 {{ 'border-warning' if q.status == 'Pending' else '' }}">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start flex-wrap">
+                <div>
+                    <h6 class="mb-1">
+                        <i class="bi bi-person-fill"></i> {{ q.patient_name }}
+                        <span class="text-muted small">({{ q.national_id }})</span>
+                    </h6>
+                    <p class="text-muted small mb-2">Submitted {{ q.date_submitted }}</p>
+                </div>
+                <div class="text-end">
+                    {% if q.status == 'Pending' %}
+                        <span class="badge bg-secondary d-block mb-2">Pending</span>
+                    {% else %}
+                        <span class="badge bg-success d-block mb-2">Answered</span>
+                    {% endif %}
+                    <a href="{{ url_for('doctor_patient_records', national_id=q.national_id) }}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-folder2-open"></i> View Patient Records
+                    </a>
+                </div>
+            </div>
+
+            <p class="mb-3"><strong>Question:</strong> {{ q.question }}</p>
+
+            {% if q.status == 'Answered' %}
+                <div class="bg-light rounded-3 p-3">
+                    <strong class="text-success"><i class="bi bi-check-circle"></i> Answer:</strong> {{ q.answer }}
+                    <small class="text-muted d-block mt-1">— {{ q.answered_by }} on {{ q.date_answered }}</small>
+                </div>
+            {% else %}
+                <form method="POST" action="{{ url_for('submit_answer', question_id=q.question_id) }}">
+                    <div class="input-group">
+                        <textarea class="form-control" name="answer" rows="2" placeholder="Type your response..." required></textarea>
+                        <button type="submit" class="btn btn-app-primary">
+                            <i class="bi bi-send"></i> Submit
+                        </button>
+                    </div>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+<div class="text-center py-5 text-muted">
+    <i class="bi bi-inbox" style="font-size: 2.5rem;"></i>
+    <p class="mt-3">No questions have been submitted yet.</p>
+</div>
+{% endif %}
+{% endblock %}

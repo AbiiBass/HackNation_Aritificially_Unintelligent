@@ -1,0 +1,47 @@
+{
+  "_metadata": {
+    "generated_at_utc": "2026-07-19T08:47:58.938469+00:00",
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+    "python_version": "3.12.3",
+    "library_versions": {
+      "pandas": "3.0.2",
+      "sklearn": "1.8.0",
+      "xgboost": "3.3.0",
+      "joblib": "1.5.3"
+    },
+    "git_commit": "not a git repo (or git unavailable) -- consider `git init` for real provenance tracking"
+  },
+  "model": "model2_women_only",
+  "target": "thyroid_dysfunction",
+  "train_auc": 1.0,
+  "val_auc": 0.5277777777777778,
+  "test_auc": 0.6357142857142857,
+  "feature_importances": {
+    "prl": 0.06689420342445374,
+    "skin_darkening": 0.06471769511699677,
+    "endometrium_mm": 0.05607457831501961,
+    "cycle_length_days": 0.05460556969046593,
+    "hirsutism": 0.0518520250916481,
+    "vit_d3": 0.050513919442892075,
+    "avg_follicle_size_right": 0.04873720556497574,
+    "lh": 0.04850773513317108,
+    "amh": 0.0484110489487648,
+    "bmi": 0.046689409762620926,
+    "regular_exercise": 0.0439334474503994,
+    "random_blood_sugar": 0.043903984129428864,
+    "fsh": 0.04219090938568115,
+    "fsh_lh_ratio": 0.039795827120542526,
+    "age": 0.034962598234415054,
+    "follicle_count_right": 0.033649470657110214,
+    "follicle_count_left": 0.03297288715839386,
+    "progesterone": 0.03171788901090622,
+    "avg_follicle_size_left": 0.03084287792444229,
+    "hair_loss": 0.02917311154305935,
+    "cycle_regularity": 0.027242615818977356,
+    "fast_food": 0.02674323320388794,
+    "acne": 0.024511246010661125,
+    "bp_diastolic": 0.021356550976634026,
+    "weight_gain": 0.0,
+    "bp_systolic": 0.0
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "_metadata": {
+    "generated_at_utc": "2026-07-19T08:47:54.795947+00:00",
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+    "python_version": "3.12.3",
+    "library_versions": {
+      "pandas": "3.0.2",
+      "sklearn": "1.8.0",
+      "xgboost": "3.3.0",
+      "joblib": "1.5.3"
+    },
+    "git_commit": "not a git repo (or git unavailable) -- consider `git init` for real provenance tracking"
+  },
+  "model": "model1_generic_clinical_baseline",
+  "target": "thyroid_dysfunction",
+  "train_auc": 0.9999910493716658,
+  "val_auc": 0.998390989541432,
+  "test_auc": 0.9946133128126202,
+  "sex_disaggregated_test_auc": {
+    "female": {
+      "n": 336,
+      "positives": 14,
+      "auc": 0.9955634427684117
+    },
+    "male": {
+      "n": 128,
+      "positives": 8,
+      "auc": 0.9916666666666666
+    }
+  },
+  "feature_importances": {
+    "free_thyroxine_index": 0.8069310784339905,
+    "tsh": 0.0811835378408432,
+    "t4": 0.03368695080280304,
+    "t3": 0.03328520059585571,
+    "age": 0.018876437097787857,
+    "t4_uptake": 0.016957441344857216,
+    "sex": 0.009079406969249249,
+    "sick": 0.0,
+    "pregnant": 0.0
+  },
+  "naming_correction": "Previously called 'male-skewed'; this cohort is actually 69% female (2182F/908M), so that name was never verified against the data. Renamed to 'generic clinical baseline'."
+}

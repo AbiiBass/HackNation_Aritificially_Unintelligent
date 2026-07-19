@@ -1,0 +1,25 @@
+{
+  "_metadata": {
+    "generated_at_utc": "2026-07-19T08:48:04.920588+00:00",
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+    "python_version": "3.12.3",
+    "library_versions": {
+      "pandas": "3.0.2",
+      "sklearn": "1.8.0",
+      "xgboost": "3.3.0",
+      "joblib": "1.5.3"
+    },
+    "git_commit": "not a git repo (or git unavailable) -- consider `git init` for real provenance tracking"
+  },
+  "model": "meta_learner",
+  "meta_features": [
+    "model2_thyroid_proba",
+    "model2_pcos_proba",
+    "pcos_criteria_count",
+    "thyroid_criteria_call"
+  ],
+  "train_accuracy": 1.0,
+  "val_accuracy": 0.8641975308641975,
+  "test_accuracy": 0.8780487804878049,
+  "excluded_model1_reason": "Model 1 requires T3/T4/T4U/FTI, unavailable for 100% of the PCOS cohort (structural feature mismatch, not missing data)."
+}

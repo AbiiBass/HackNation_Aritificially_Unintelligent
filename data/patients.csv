@@ -1,0 +1,6 @@
+national_id,name,dob,gender,phone,email,blood_type
+P001,Sarah Johnson,1990-04-12,Female,555-0101,sarah.johnson@example.com,O+
+P002,Amina Rodriguez,1985-09-23,Female,555-0102,amina.rodriguez@example.com,A-
+P003,Emily Chen,1998-01-30,Female,555-0103,emily.chen@example.com,B+
+P004,Grace Okafor,1978-11-05,Female,555-0104,grace.okafor@example.com,AB+
+P005,Maria Silva,2001-06-17,Female,555-0105,maria.silva@example.com,O-

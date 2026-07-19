@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Patient Records — WHH Platform{% endblock %}
+
+{% block content %}
+<h2 class="fw-bold mb-1"><i class="bi bi-folder2-open"></i> View Patient Records</h2>
+<p class="text-muted mb-4">Search a patient by National ID to view their complete record history across all hospitals.</p>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('doctor_patient_records') }}" class="row g-2 align-items-end">
+            <div class="col-md-8">
+                <label class="form-label">Patient National ID</label>
+                <input type="text" name="national_id" class="form-control" placeholder="e.g. P001"
+                       value="{{ searched_id }}" required>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-app-primary w-100"><i class="bi bi-search"></i> Search</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if patient %}
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3"><strong>Name:</strong><br>{{ patient.name }}</div>
+            <div class="col-md-2"><strong>National ID:</strong><br>{{ patient.national_id }}</div>
+            <div class="col-md-2"><strong>DOB:</strong><br>{{ patient.dob }}</div>
+            <div class="col-md-2"><strong>Gender:</strong><br>{{ patient.gender }}</div>
+            <div class="col-md-2"><strong>Blood Type:</strong><br>{{ patient.blood_type }}</div>
+            <div class="col-md-3 mt-2"><strong>Phone:</strong><br>{{ patient.phone }}</div>
+            <div class="col-md-5 mt-2"><strong>Email:</strong><br>{{ patient.email }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <i class="bi bi-clock-history"></i> Record History (All Hospitals)
+            </div>
+            <div class="card-body">
+                {% if records %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Hospital</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in records|sort(attribute='record_date', reverse=True) %}
+                            <tr>
+                                <td>{{ r.record_date }}</td>
+                                <td>{{ r.hospital }}</td>
+                                <td>
+                                    {% if r.record_type == 'Lab Report' %}
+                                        <span class="badge bg-info-subtle text-info-emphasis">{{ r.record_type }}</span>
+                                    {% else %}
+                                        <span class="badge bg-warning-subtle text-warning-emphasis">{{ r.record_type }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ r.description }}</td>
+                                <td class="text-end">
+                                    <a href="{{ url_for('download_record', record_id=r.record_id, filename=r.filename) }}"
+                                       class="btn btn-sm btn-app-primary">
+                                        <i class="bi bi-download"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4 mb-0">No records found for this patient yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <i class="bi bi-upload"></i> Upload New Document
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('upload_record') }}" enctype="multipart/form-data">
+                    <input type="hidden" name="national_id" value="{{ patient.national_id }}">
+
+                    <div class="mb-3">
+                        <label class="form-label">Hospital</label>
+                        <input type="text" name="hospital" class="form-control" placeholder="e.g. St. Mary General Hospital" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Record Type</label>
+                        <select name="record_type" class="form-select" required>
+                            <option value="Lab Report">Lab Report</option>
+                            <option value="Screening">Screening</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Record Date</label>
+                        <input type="date" name="record_date" class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" name="description" class="form-control" placeholder="e.g. Hormone panel results" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Document (PDF only)</label>
+                        <input type="file" name="document" class="form-control" accept=".pdf" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-app-primary w-100">
+                        <i class="bi bi-upload"></i> Upload Document
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% elif searched_id %}
+<div class="alert alert-warning">No patient found with National ID "{{ searched_id }}".</div>
+{% endif %}
+{% endblock %}
