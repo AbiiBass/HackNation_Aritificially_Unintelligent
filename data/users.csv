@@ -1,0 +1,9 @@
+username,password,role,name
+P001,pass123,patient,Sarah Johnson
+P002,pass123,patient,Amina Rodriguez
+P003,pass123,patient,Emily Chen
+P004,pass123,patient,Grace Okafor
+P005,pass123,patient,Maria Silva
+D101,doc123,doctor,Dr. Lisa Tran
+D102,doc123,doctor,Dr. Robert Kim
+D103,doc123,doctor,Dr. Nadia Hassan

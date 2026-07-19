@@ -1,0 +1,11 @@
+record_id,national_id,patient_name,hospital,record_type,record_date,filename,uploaded_by,description
+R001,P001,Sarah Johnson,St. Mary General Hospital,Lab Report,2024-02-14,R001_sarah_johnson_lab.pdf,D101,Hormone panel - LH/FSH/Estradiol
+R002,P001,Sarah Johnson,Northside Women's Clinic,Screening,2024-06-20,R002_sarah_johnson_screening.pdf,D102,Pelvic ultrasound screening
+R003,P001,Sarah Johnson,St. Mary General Hospital,Lab Report,2025-01-10,R003_sarah_johnson_lab.pdf,D101,Thyroid function panel TSH/T3/T4
+R004,P002,Amina Rodriguez,Northside Women's Clinic,Lab Report,2024-03-05,R004_amina_rodriguez_lab.pdf,D102,Complete hormone and glucose panel
+R005,P002,Amina Rodriguez,Cedar Valley Medical Center,Screening,2024-09-18,R005_amina_rodriguez_screening.pdf,D103,Annual reproductive health screening
+R006,P003,Emily Chen,St. Mary General Hospital,Lab Report,2024-05-22,R006_emily_chen_lab.pdf,D101,Menstrual cycle hormone tracking
+R007,P004,Grace Okafor,Cedar Valley Medical Center,Lab Report,2024-07-11,R007_grace_okafor_lab.pdf,D103,Menopause hormone panel
+R008,P004,Grace Okafor,Cedar Valley Medical Center,Screening,2025-01-29,R008_grace_okafor_screening.pdf,D103,Bone density and cardiovascular screening
+R009,P005,Maria Silva,Northside Women's Clinic,Lab Report,2024-11-02,R009_maria_silva_lab.pdf,D102,PCOS diagnostic hormone panel
+R010,P005,Maria Silva,St. Mary General Hospital,Screening,2025-02-15,R010_maria_silva_screening.pdf,D101,Pelvic ultrasound follow-up
