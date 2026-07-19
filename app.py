@@ -175,7 +175,11 @@ def chatbot_message():
     history.append({"role": "model", "text": reply})
     session["chat_history"] = history[-(MAX_HISTORY_TURNS * 2):]
 
-    return jsonify({"reply": reply, "safety_flag": safety_flag})
+    return jsonify({
+        "reply": reply,
+        "safety_flag": safety_flag,
+        "offer_summary": bool(safety_flag),
+    })
 
 
 @app.route("/chatbot/reset", methods=["POST"])
@@ -183,6 +187,22 @@ def chatbot_message():
 def chatbot_reset():
     session["chat_history"] = []
     return jsonify({"status": "ok"})
+
+
+@app.route("/chatbot/summarize-for-doctor", methods=["POST"])
+@role_required("patient")
+def chatbot_summarize_for_doctor():
+    history = session.get("chat_history", [])
+    model_history = [{"role": h["role"], "text": h["text"]} for h in history]
+
+    if not model_history:
+        return jsonify({"error": "There's no conversation yet to summarize."}), 400
+
+    summary = gemini_client.summarize_for_doctor(model_history)
+    if not summary:
+        return jsonify({"error": "Couldn't generate a summary right now. Please write your question manually."}), 502
+
+    return jsonify({"summary": summary})
 
 
 @app.route("/ask-doctor", methods=["POST"])
@@ -208,6 +228,10 @@ def doctor_patient_records():
 
     if request.method == "POST":
         searched_id = request.form.get("national_id", "").strip()
+    else:
+        searched_id = request.args.get("national_id", "").strip()
+
+    if searched_id:
         patient = db.get_patient(searched_id)
         if patient:
             records = db.get_records_for_patient(searched_id)
