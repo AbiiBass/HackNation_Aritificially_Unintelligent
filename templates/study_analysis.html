@@ -16,7 +16,7 @@
                     <div class="mb-3">
                         <label class="form-label">Patient Document (PDF)</label>
                         <input type="file" name="document" class="form-control" accept=".pdf" required>
-                        <div class="form-text">The document text will be extracted and sent to the prediction model.</div>
+                        <div class="form-text">The document will be parsed and sent to the prediction model.</div>
                     </div>
                     <button type="submit" class="btn btn-app-primary w-100">
                         <i class="bi bi-cpu"></i> Run Analysis
@@ -35,9 +35,28 @@
 
     <div class="col-lg-7">
         {% if result %}
+
+        {% if result.warnings %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-warning-subtle">
+                <i class="bi bi-exclamation-triangle"></i> Notes on This Prediction
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    {% for w in result.warnings %}
+                    <li>{{ w }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-app-primary text-white">
                 <i class="bi bi-bar-chart-fill"></i> Diagnosis Confidence Levels
+                {% if not result.joint_available %}
+                <span class="badge bg-light text-dark ms-2">Individual model estimate — joint ensemble unavailable</span>
+                {% endif %}
             </div>
             <div class="card-body">
                 <div class="table-responsive">
@@ -51,15 +70,19 @@
                         </thead>
                         <tbody>
                             {% for d in result.diagnoses %}
-                            <tr class="{{ 'table-success' if loop.first else '' }}">
+                            <tr class="{{ 'table-success' if loop.first and result.joint_available else '' }}">
                                 <td>
                                     <strong>{{ d.condition }}</strong>
-                                    {% if loop.first %}<span class="badge bg-success ms-2">Top Match</span>{% endif %}
+                                    {% if loop.first and result.joint_available %}
+                                        <span class="badge bg-success ms-2">Top Match</span>
+                                    {% elif loop.first %}
+                                        <span class="badge bg-secondary ms-2">Highest Individual Estimate</span>
+                                    {% endif %}
                                 </td>
                                 <td class="fw-bold">{{ "%.0f"|format(d.confidence * 100) }}%</td>
                                 <td>
                                     <div class="progress" style="height: 18px;">
-                                        <div class="progress-bar {{ 'bg-success' if loop.first else 'bg-secondary' }}"
+                                        <div class="progress-bar {{ 'bg-success' if (loop.first and result.joint_available) else 'bg-secondary' }}"
                                              role="progressbar"
                                              style="width: {{ d.confidence * 100 }}%;">
                                         </div>

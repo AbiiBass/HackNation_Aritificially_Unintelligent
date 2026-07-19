@@ -17,7 +17,7 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 from utils import data_helpers as db
-from model import predict as model
+from model import model_adapter
 from chatbot import gemini_client, safety
 
 load_dotenv()  # loads GEMINI_API_KEY from a .env file if present
@@ -277,8 +277,7 @@ def study_analysis():
         file.save(temp_path)
 
         try:
-            extracted_text = model.extract_text_from_pdf(temp_path)
-            result = model.predict(extracted_text)
+            result = model_adapter.analyze_pdf(temp_path)
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)

@@ -1,0 +1,48 @@
+{
+  "_metadata": {
+    "generated_at_utc": "2026-07-19T08:48:00.202894+00:00",
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+    "python_version": "3.12.3",
+    "library_versions": {
+      "pandas": "3.0.2",
+      "sklearn": "1.8.0",
+      "xgboost": "3.3.0",
+      "joblib": "1.5.3"
+    },
+    "git_commit": "not a git repo (or git unavailable) -- consider `git init` for real provenance tracking"
+  },
+  "model": "model2b_women_only_pcos",
+  "target": "pcos_diagnosis",
+  "train_auc": 1.0,
+  "val_auc": 0.9202797202797203,
+  "test_auc": 0.9609427609427609,
+  "feature_importances": {
+    "follicle_count_right": 0.17157700657844543,
+    "hirsutism": 0.09149108082056046,
+    "skin_darkening": 0.08828567713499069,
+    "weight_gain": 0.06463547050952911,
+    "amh": 0.0586530826985836,
+    "follicle_count_left": 0.05662723630666733,
+    "bmi": 0.05467318743467331,
+    "avg_follicle_size_left": 0.03591761738061905,
+    "cycle_regularity": 0.035563334822654724,
+    "avg_follicle_size_right": 0.03396352753043175,
+    "acne": 0.02948724292218685,
+    "fsh_lh_ratio": 0.027701662853360176,
+    "hair_loss": 0.02560349926352501,
+    "regular_exercise": 0.023268545046448708,
+    "prl": 0.022198017686605453,
+    "endometrium_mm": 0.020456962287425995,
+    "lh": 0.01983417011797428,
+    "fast_food": 0.0178874172270298,
+    "cycle_length_days": 0.01775462180376053,
+    "age": 0.01698272116482258,
+    "random_blood_sugar": 0.016371754929423332,
+    "tsh": 0.01592189446091652,
+    "progesterone": 0.015914887189865112,
+    "fsh": 0.015522045083343983,
+    "bp_systolic": 0.015003429725766182,
+    "vit_d3": 0.008703852072358131,
+    "bp_diastolic": 0.0
+  }
+}
